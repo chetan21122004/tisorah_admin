@@ -1,7 +1,7 @@
 "use client"
 
 import { use, useEffect, useRef, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { getProductById, updateProduct, deleteProduct, getCategories } from "@/lib/supabase"
 import { uploadMultipleImages, deleteImage } from "@/lib/storage"
 import { Button } from "@/components/ui/button"
@@ -11,8 +11,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
 import Link from "next/link"
+import { ArrowLeft, Edit3, Trash2, Upload, X, Star, Package, Truck, Tag, Image as ImageIcon } from "lucide-react"
 
 interface Category {
   id: string
@@ -24,6 +27,7 @@ interface Category {
 export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [product, setProduct] = useState<any>(null)
   const [categories, setCategories] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -37,6 +41,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [selectedDisplayImageIndex, setSelectedDisplayImageIndex] = useState<number | null>(null)
   const [selectedHoverImageIndex, setSelectedHoverImageIndex] = useState<number | null>(null)
+
+  // Check if we should open in edit mode directly
+  useEffect(() => {
+    const edit = searchParams.get('edit')
+    if (edit === 'true') {
+      setEditMode(true)
+    }
+  }, [searchParams])
 
   // Get parent categories (no parent_id)
   const mainCategories = categories.filter(cat => !cat.parent_id)
@@ -77,7 +89,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         setProduct(updatedProd)
         setFormData(updatedProd)
       } else {
-        // Handle case where product is not found
         setProduct(null)
         setFormData({})
       }
@@ -176,14 +187,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       if (displayImage) {
         productData.display_image = displayImage;
       } else {
-        // Explicitly set to null if not provided to clear existing value
         productData.display_image = null;
       }
       
       if (hoverImage) {
         productData.hover_image = hoverImage;
       } else {
-        // Explicitly set to null if not provided to clear existing value
         productData.hover_image = null;
       }
 
@@ -192,10 +201,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       if (updated) {
         setSuccessMsg("Product updated successfully")
         setProduct(updated)
-        // Refresh the page after a short delay to show success message
-        setTimeout(() => {
-          router.refresh()
-        }, 1500)
+        setEditMode(false)
+        toast.success("Product updated successfully")
+        // Remove edit parameter from URL
+        const url = new URL(window.location.href)
+        url.searchParams.delete('edit')
+        window.history.replaceState({}, '', url.toString())
       } else {
         setErrorMsg("Failed to update product. Please check all fields and try again.")
       }
@@ -208,12 +219,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   }
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this product?")) return
+    if (!confirm("Are you sure you want to delete this product? This action cannot be undone.")) return
     setDeleting(true)
     try {
       const ok = await deleteProduct(id)
       if (ok) {
-        toast.success("Product deleted")
+        toast.success("Product deleted successfully")
         router.push("/dashboard/products")
       } else {
         toast.error("Failed to delete product")
@@ -236,9 +247,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       setFormData((prev: any) => ({ ...prev, images: updatedImages }))
       // Save to DB
       const updated = await updateProduct(id, { ...formData, images: updatedImages })
-      setProduct(updated)
-      setFormData(updated)
-      toast.success("Images uploaded!")
+      if (updated) {
+        setProduct(updated)
+        setFormData(updated)
+        toast.success("Images uploaded successfully!")
+      }
     } catch (err: any) {
       setErrorMsg(err?.message || "Error uploading images")
       toast.error(err?.message || "Error uploading images")
@@ -258,9 +271,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       setFormData((prev: any) => ({ ...prev, images: updatedImages }))
       // Save to DB
       const updated = await updateProduct(id, { ...formData, images: updatedImages })
-      setProduct(updated)
-      setFormData(updated)
-      toast.success("Image deleted!")
+      if (updated) {
+        setProduct(updated)
+        setFormData(updated)
+        toast.success("Image deleted successfully!")
+      }
     } catch (err: any) {
       setErrorMsg(err?.message || "Error deleting image")
       toast.error(err?.message || "Error deleting image")
@@ -270,299 +285,516 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   }
 
   if (loading) {
-    return <div className="p-8 text-center">Loading...</div>
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="animate-pulse">
+            <div className="h-8 bg-slate-200 rounded w-64 mb-8"></div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="space-y-4">
+                <div className="aspect-square bg-slate-200 rounded-xl"></div>
+                <div className="grid grid-cols-4 gap-2">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="aspect-square bg-slate-200 rounded-lg"></div>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-6">
+                <div className="h-8 bg-slate-200 rounded w-3/4"></div>
+                <div className="h-4 bg-slate-200 rounded w-1/2"></div>
+                <div className="h-20 bg-slate-200 rounded"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (!product) {
-    return <div className="p-8 text-center">Product not found.</div>
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center py-12">
+            <div className="w-20 h-20 bg-slate-200 rounded-full mx-auto mb-4 flex items-center justify-center">
+              <Package className="w-8 h-8 text-slate-400" />
+            </div>
+            <h2 className="text-2xl font-semibold text-slate-700 mb-2">Product Not Found</h2>
+            <p className="text-slate-500 mb-6">The product you're looking for doesn't exist or has been removed.</p>
+            <Link href="/dashboard/products">
+              <Button className="bg-primary hover:bg-primary/90">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Products
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-8 relative">
-      <div className="pattern-dots pattern-opacity-10 pattern-secondary absolute inset-0 pointer-events-none" />
-      <div className="flex items-center mb-4">
-        <Link href="/dashboard/products" className="mr-4">
-          <Button className="rounded-full" variant="ghost" size="icon">
-            ←
-            <span className="sr-only">Back</span>
-          </Button>
-        </Link>
-        <h1 className="text-3xl font-serif font-bold tracking-tight text-primary">Product Details</h1>
-      </div>
-      {errorMsg && <div className="text-red-600 text-sm mb-2">{errorMsg}</div>}
-      {successMsg && <div className="text-green-600 text-sm mb-2">{successMsg}</div>}
-      <Card className="border-neutral-200 bg-white">
-        <CardHeader>
-          <CardTitle className="text-xl font-serif">{product.name}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Images Section */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="font-medium">Images</h2>
-              <div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/png, image/jpeg, image/webp"
-                  multiple
-                  className="hidden"
-                  id="product-images-upload"
-                  onChange={handleImageUpload}
-                  disabled={imageUploading}
-                />
-                <Button
-                  type="button"
-                  className="bg-secondary hover:bg-secondary/90 text-white"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={imageUploading}
-                >
-                  {imageUploading ? "Uploading..." : "Upload Images"}
-                </Button>
-              </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="max-w-7xl mx-auto p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <Link href="/dashboard/products">
+              <Button variant="ghost" size="sm" className="hover:bg-white/50">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Products
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-3xl font-bold text-slate-800">Product Details</h1>
+              <p className="text-slate-600 mt-1">Manage your product information and settings</p>
             </div>
-            {formData.images && formData.images.length > 0 ? (
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                  {formData.images.map((img: string, idx: number) => (
-                    <div key={img} className="relative group border rounded-lg overflow-hidden">
-                      <img src={img} alt={`Product image ${idx + 1}`} className="w-full h-40 object-cover" />
-                      <div className="absolute top-2 right-2 flex gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleImageDelete(img)}
-                          className="bg-white/80 text-red-500 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                          disabled={imageUploading}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M18 6 6 18"></path>
-                            <path d="m6 6 12 12"></path>
-                          </svg>
-                          <span className="sr-only">Remove</span>
-                        </button>
-                      </div>
-                      {editMode && (
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white p-1 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedDisplayImageIndex(formData.images.indexOf(img))}
-                            className={`text-xs px-1 py-0.5 rounded ${selectedDisplayImageIndex === formData.images.indexOf(img) ? 'bg-green-600' : 'bg-gray-600 hover:bg-gray-500'}`}
-                          >
-                            {selectedDisplayImageIndex === formData.images.indexOf(img) ? 'Display ✓' : 'Set as Display'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedHoverImageIndex(formData.images.indexOf(img))}
-                            className={`text-xs px-1 py-0.5 rounded ${selectedHoverImageIndex === formData.images.indexOf(img) ? 'bg-blue-600' : 'bg-gray-600 hover:bg-gray-500'}`}
-                          >
-                            {selectedHoverImageIndex === formData.images.indexOf(img) ? 'Hover ✓' : 'Set as Hover'}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+          </div>
+          
+          {!editMode && (
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => setEditMode(true)}
+                className="bg-primary hover:bg-primary/90"
+              >
+                <Edit3 className="w-4 h-4 mr-2" />
+                Edit Product
+              </Button>
+              <Button
+                onClick={handleDelete}
+                variant="destructive"
+                disabled={deleting}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                {deleting ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Error/Success Messages */}
+        {errorMsg && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-700 text-sm">{errorMsg}</p>
+          </div>
+        )}
+        {successMsg && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-green-700 text-sm">{successMsg}</p>
+          </div>
+        )}
+
+        {editMode ? (
+          <form onSubmit={handleUpdate} className="space-y-8">
+            {/* Product Images */}
+            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ImageIcon className="w-5 h-5 text-primary" />
+                    <CardTitle className="text-xl">Product Images</CardTitle>
+                  </div>
+                  <div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/png, image/jpeg, image/webp"
+                      multiple
+                      className="hidden"
+                      id="product-images-upload"
+                      onChange={handleImageUpload}
+                      disabled={imageUploading}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={imageUploading}
+                      className="bg-white hover:bg-slate-50"
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      {imageUploading ? "Uploading..." : "Upload Images"}
+                    </Button>
+                  </div>
                 </div>
-                
-                {editMode && (
-                  <div className="mt-4 border-t pt-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <h3 className="font-medium mb-2">Display Image</h3>
-                        <div className="h-40 border rounded bg-gray-50 relative flex items-center justify-center overflow-hidden">
-                          {selectedDisplayImageIndex !== null && formData.images && formData.images.length > selectedDisplayImageIndex ? (
-                            <>
-                              <img src={formData.images[selectedDisplayImageIndex]} alt="Display image" className="object-contain max-h-full" />
+              </CardHeader>
+              <CardContent>
+                {formData.images && formData.images.length > 0 ? (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                      {formData.images.map((img: string, idx: number) => (
+                        <div key={img} className="relative group">
+                          <div className="aspect-square rounded-lg overflow-hidden border-2 border-slate-200 hover:border-primary transition-colors">
+                            <img src={img} alt={`Product image ${idx + 1}`} className="w-full h-full object-cover" />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleImageDelete(img)}
+                            className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                            disabled={imageUploading}
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex gap-1">
                               <button
                                 type="button"
-                                onClick={() => setSelectedDisplayImageIndex(null)}
-                                className="absolute top-2 right-2 bg-white/80 text-red-500 rounded-full p-1"
+                                onClick={() => setSelectedDisplayImageIndex(idx)}
+                                className={`text-xs px-2 py-1 rounded ${
+                                  selectedDisplayImageIndex === idx 
+                                    ? 'bg-green-500 text-white' 
+                                    : 'bg-white/20 text-white hover:bg-white/30'
+                                }`}
                               >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M18 6 6 18"></path>
-                                  <path d="m6 6 12 12"></path>
-                                </svg>
-                                <span className="sr-only">Clear</span>
+                                {selectedDisplayImageIndex === idx ? '✓ Display' : 'Display'}
                               </button>
-                            </>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedHoverImageIndex(idx)}
+                                className={`text-xs px-2 py-1 rounded ${
+                                  selectedHoverImageIndex === idx 
+                                    ? 'bg-blue-500 text-white' 
+                                    : 'bg-white/20 text-white hover:bg-white/30'
+                                }`}
+                              >
+                                {selectedHoverImageIndex === idx ? '✓ Hover' : 'Hover'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-slate-200">
+                      <div>
+                        <Label className="text-sm font-medium text-slate-700 mb-2 block">Display Image Preview</Label>
+                        <div className="aspect-video bg-slate-50 rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden">
+                          {selectedDisplayImageIndex !== null && formData.images && formData.images.length > selectedDisplayImageIndex ? (
+                            <img src={formData.images[selectedDisplayImageIndex]} alt="Display image" className="w-full h-full object-cover" />
                           ) : (
-                            <span className="text-sm text-gray-400">No display image selected</span>
+                            <div className="text-center">
+                              <ImageIcon className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                              <p className="text-sm text-slate-500">No display image selected</p>
+                            </div>
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">This image appears first on product cards</p>
+                        <p className="text-xs text-slate-500 mt-2">This image appears first on product cards</p>
                       </div>
                       <div>
-                        <h3 className="font-medium mb-2">Hover Image</h3>
-                        <div className="h-40 border rounded bg-gray-50 relative flex items-center justify-center overflow-hidden">
+                        <Label className="text-sm font-medium text-slate-700 mb-2 block">Hover Image Preview</Label>
+                        <div className="aspect-video bg-slate-50 rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden">
                           {selectedHoverImageIndex !== null && formData.images && formData.images.length > selectedHoverImageIndex ? (
-                            <>
-                              <img src={formData.images[selectedHoverImageIndex]} alt="Hover image" className="object-contain max-h-full" />
-                              <button
-                                type="button"
-                                onClick={() => setSelectedHoverImageIndex(null)}
-                                className="absolute top-2 right-2 bg-white/80 text-red-500 rounded-full p-1"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M18 6 6 18"></path>
-                                  <path d="m6 6 12 12"></path>
-                                </svg>
-                                <span className="sr-only">Clear</span>
-                              </button>
-                            </>
+                            <img src={formData.images[selectedHoverImageIndex]} alt="Hover image" className="w-full h-full object-cover" />
                           ) : (
-                            <span className="text-sm text-gray-400">No hover image selected</span>
+                            <div className="text-center">
+                              <ImageIcon className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                              <p className="text-sm text-slate-500">No hover image selected</p>
+                            </div>
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">This image appears when hovering over product cards</p>
+                        <p className="text-xs text-slate-500 mt-2">This image appears when hovering over product cards</p>
                       </div>
                     </div>
                   </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <ImageIcon className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                    <p className="text-slate-500 mb-4">No images uploaded yet</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={imageUploading}
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      Upload Your First Image
+                    </Button>
+                  </div>
                 )}
-              </div>
-            ) : (
-              <div className="text-muted-foreground">No images uploaded.</div>
-            )}
-          </div>
-          {editMode ? (
-            <form onSubmit={handleUpdate} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Product Name *</Label>
-                  <Input id="name" name="name" value={formData.name} onChange={handleChange} required className="bg-white border-neutral-200" />
+              </CardContent>
+            </Card>
+
+            {/* Product Information */}
+            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="text-xl">Product Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="name" className="text-sm font-medium text-slate-700">Product Name *</Label>
+                    <Input 
+                      id="name" 
+                      name="name" 
+                      value={formData.name} 
+                      onChange={handleChange} 
+                      required 
+                      className="bg-white border-slate-300 focus:border-primary focus:ring-primary"
+                      placeholder="Enter product name"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="moq" className="text-sm font-medium text-slate-700">Minimum Order Quantity</Label>
+                    <Input 
+                      id="moq" 
+                      name="moq" 
+                      type="number"
+                      value={formData.moq || ""} 
+                      onChange={handleChange} 
+                      className="bg-white border-slate-300 focus:border-primary focus:ring-primary"
+                      placeholder="e.g., 10"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="price_range">Price Range (₹) *</Label>
-                  <div className="grid grid-cols-2 gap-4">
+
+                <div className="space-y-4">
+                  <Label className="text-sm font-medium text-slate-700">Price Range (₹) *</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="price_min">Minimum Price (₹)</Label>
+                      <Label htmlFor="price_min" className="text-sm text-slate-600">Minimum Price</Label>
                       <Input 
                         id="price_min" 
                         name="price_min" 
                         type="number" 
                         value={formData.price_min || ""} 
                         onChange={handleChange} 
-                        className="bg-white border-neutral-200" 
+                        className="bg-white border-slate-300 focus:border-primary focus:ring-primary"
+                        placeholder="₹0"
                         required
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="price_max">Maximum Price (₹)</Label>
+                      <Label htmlFor="price_max" className="text-sm text-slate-600">Maximum Price</Label>
                       <Input 
                         id="price_max" 
                         name="price_max" 
                         type="number" 
                         value={formData.price_max || ""} 
                         onChange={handleChange} 
-                        className="bg-white border-neutral-200" 
+                        className="bg-white border-slate-300 focus:border-primary focus:ring-primary"
+                        placeholder="₹0"
                         required
                       />
                     </div>
                   </div>
                 </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="main_category" className="text-sm font-medium text-slate-700">Main Category *</Label>
+                    <Select value={formData.main_category || "none"} onValueChange={(v: string) => handleSelectChange("main_category", v)}>
+                      <SelectTrigger className="bg-white border-slate-300 focus:border-primary focus:ring-primary">
+                        <SelectValue placeholder="Select main category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {mainCategories.map((cat: any) => (
+                          <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="sub_category" className="text-sm font-medium text-slate-700">Sub Category</Label>
+                    <Select value={formData.sub_category || "none"} onValueChange={(v: string) => handleSelectChange("sub_category", v)} disabled={!formData.main_category || subCategories.length === 0}>
+                      <SelectTrigger className="bg-white border-slate-300 focus:border-primary focus:ring-primary">
+                        <SelectValue placeholder="Select sub category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {subCategories.map((cat: any) => (
+                          <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="main_category">Main Category</Label>
-                  <Select value={formData.main_category || "none"} onValueChange={(v: string) => handleSelectChange("main_category", v)}>
-                    <SelectTrigger className="bg-white border-neutral-200">
-                      <SelectValue placeholder="Select main category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {mainCategories.map((cat: any) => (
-                        <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="delivery" className="text-sm font-medium text-slate-700">Delivery Information</Label>
+                  <Input 
+                    id="delivery" 
+                    name="delivery" 
+                    value={formData.delivery || ""} 
+                    onChange={handleChange} 
+                    className="bg-white border-slate-300 focus:border-primary focus:ring-primary"
+                    placeholder="e.g., 3-5 business days"
+                  />
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="sub_category">Sub Category</Label>
-                  <Select value={formData.sub_category || "none"} onValueChange={(v: string) => handleSelectChange("sub_category", v)} disabled={!formData.main_category || subCategories.length === 0}>
-                    <SelectTrigger className="bg-white border-neutral-200">
-                      <SelectValue placeholder="Select sub category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {subCategories.map((cat: any) => (
-                        <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="description" className="text-sm font-medium text-slate-700">Description</Label>
+                  <Textarea 
+                    id="description" 
+                    name="description" 
+                    value={formData.description || ""} 
+                    onChange={handleChange} 
+                    className="min-h-32 bg-white border-slate-300 focus:border-primary focus:ring-primary"
+                    placeholder="Describe your product..."
+                  />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="moq">Minimum Order Quantity</Label>
-                  <Input id="moq" name="moq" value={formData.moq || ""} onChange={handleChange} className="bg-white border-neutral-200" />
+
+                <div className="flex flex-wrap gap-6">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="featured" 
+                      checked={!!formData.featured} 
+                      onCheckedChange={(checked: boolean | "indeterminate") => handleCheckboxChange("featured", !!checked)} 
+                    />
+                    <Label htmlFor="featured" className="text-sm font-medium text-slate-700">Featured Product</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="customizable" 
+                      checked={!!formData.customizable} 
+                      onCheckedChange={(checked: boolean | "indeterminate") => handleCheckboxChange("customizable", !!checked)} 
+                    />
+                    <Label htmlFor="customizable" className="text-sm font-medium text-slate-700">Customizable</Label>
+                  </div>
                 </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="delivery">Delivery Information</Label>
-                  <Input id="delivery" name="delivery" value={formData.delivery || ""} onChange={handleChange} className="bg-white border-neutral-200" />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea id="description" name="description" value={formData.description || ""} onChange={handleChange} className="min-h-32 bg-white border-neutral-200" />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox id="featured" checked={!!formData.featured} onCheckedChange={(checked: boolean | "indeterminate") => handleCheckboxChange("featured", !!checked)} />
-                  <Label htmlFor="featured">Featured Product</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox id="customizable" checked={!!formData.customizable} onCheckedChange={(checked: boolean | "indeterminate") => handleCheckboxChange("customizable", !!checked)} />
-                  <Label htmlFor="customizable">Customizable</Label>
-                </div>
-              </div>
-              <div className="flex gap-2 justify-end">
-                <Button type="button" variant="outline" onClick={() => setEditMode(false)} className="bg-white border-neutral-200">Cancel</Button>
-                <Button type="submit" className="bg-secondary hover:bg-secondary/90 text-white" disabled={updating}>{updating ? "Saving..." : "Save Changes"}</Button>
-              </div>
-            </form>
-          ) : (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <p className="text-sm text-muted-foreground">Name</p>
-                  <p className="font-medium">{product.name}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Price</p>
-                  <p className="font-medium">
-                    {product.has_price_range 
-                      ? `₹${product.price_min} - ₹${product.price_max}` 
-                      : `₹${product.price}`}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Categories</p>
-                  <p className="font-medium">
-                    {product.main_category_data?.name || 'No main category'} 
-                    {product.sub_category_data?.name && ` / ${product.sub_category_data.name}`}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">MOQ</p>
-                  <p className="font-medium">{product.moq || "-"}</p>
-                </div>
-                <div className="md:col-span-2">
-                  <p className="text-sm text-muted-foreground">Delivery</p>
-                  <p className="font-medium">{product.delivery || "-"}</p>
-                </div>
-                <div className="md:col-span-2">
-                  <p className="text-sm text-muted-foreground">Description</p>
-                  <p className="font-medium whitespace-pre-line">{product.description || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Featured</p>
-                  <p className="font-medium">{product.featured ? "Yes" : "No"}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Customizable</p>
-                  <p className="font-medium">{product.customizable ? "Yes" : "No"}</p>
-                </div>
-              </div>
-              <div className="flex gap-2 justify-end">
-                <Button onClick={() => setEditMode(true)} className="bg-secondary hover:bg-secondary/90 text-white">Edit</Button>
-                <Button onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white" disabled={deleting}>{deleting ? "Deleting..." : "Delete"}</Button>
-              </div>
+              </CardContent>
+            </Card>
+
+            {/* Form Actions */}
+            <div className="flex justify-end gap-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  setEditMode(false)
+                  setFormData(product)
+                  // Remove edit parameter from URL
+                  const url = new URL(window.location.href)
+                  url.searchParams.delete('edit')
+                  window.history.replaceState({}, '', url.toString())
+                }}
+                className="bg-white hover:bg-slate-50"
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={updating}
+                className="bg-primary hover:bg-primary/90 min-w-32"
+              >
+                {updating ? "Saving..." : "Save Changes"}
+              </Button>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </form>
+        ) : (
+          /* View Mode */
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Product Images */}
+            <div className="space-y-4">
+              <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm overflow-hidden">
+                <div className="aspect-square bg-slate-100">
+                  {product.images && product.images.length > 0 ? (
+                    <img 
+                      src={product.display_image || product.images[0]} 
+                      alt={product.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <div className="text-center">
+                        <ImageIcon className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+                        <p className="text-slate-500">No image available</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Card>
+              
+              {product.images && product.images.length > 1 && (
+                <div className="grid grid-cols-4 gap-2">
+                  {product.images.slice(0, 4).map((img: string, idx: number) => (
+                    <div key={idx} className="aspect-square rounded-lg overflow-hidden border-2 border-slate-200 hover:border-primary transition-colors cursor-pointer">
+                      <img src={img} alt={`Product ${idx + 1}`} className="w-full h-full object-cover" />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Product Information */}
+            <div className="space-y-6">
+              <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+                <CardHeader className="pb-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle className="text-2xl font-bold text-slate-800 mb-2">{product.name}</CardTitle>
+                      <div className="flex items-center gap-2 mb-4">
+                        {product.featured && (
+                          <Badge className="bg-primary text-white">
+                            <Star className="w-3 h-3 mr-1" />
+                            Featured
+                          </Badge>
+                        )}
+                        {product.customizable && (
+                          <Badge variant="outline" className="border-primary text-primary">
+                            Customizable
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-3xl font-bold text-primary">
+                    {product.has_price_range 
+                      ? `₹${Number(product.price_min).toLocaleString('en-IN')} - ₹${Number(product.price_max).toLocaleString('en-IN')}` 
+                      : `₹${Number(product.price).toLocaleString('en-IN')}`}
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex items-center gap-2">
+                      <Tag className="w-4 h-4 text-slate-500" />
+                      <div>
+                        <p className="text-sm text-slate-500">Category</p>
+                        <p className="font-medium text-slate-800">
+                          {product.main_category_data?.name || 'Uncategorized'}
+                          {product.sub_category_data?.name && ` / ${product.sub_category_data.name}`}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {product.moq && (
+                      <div className="flex items-center gap-2">
+                        <Package className="w-4 h-4 text-slate-500" />
+                        <div>
+                          <p className="text-sm text-slate-500">MOQ</p>
+                          <p className="font-medium text-slate-800">{product.moq} units</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {product.delivery && (
+                      <div className="flex items-center gap-2">
+                        <Truck className="w-4 h-4 text-slate-500" />
+                        <div>
+                          <p className="text-sm text-slate-500">Delivery</p>
+                          <p className="font-medium text-slate-800">{product.delivery}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {product.description && (
+                    <>
+                      <Separator />
+                      <div>
+                        <h3 className="font-semibold text-slate-800 mb-2">Description</h3>
+                        <p className="text-slate-600 leading-relaxed whitespace-pre-line">{product.description}</p>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 } 

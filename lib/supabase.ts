@@ -14,8 +14,8 @@ export async function getProducts() {
     .from('products')
     .select(`
       *,
-      main_category_data:categories!products_main_category_fkey(id, name, slug),
-      sub_category_data:categories!products_sub_category_fkey(id, name, slug)
+      main_category_data:categories!main_category(id, name, slug),
+      sub_category_data:categories!sub_category(id, name, slug)
     `)
     .order('created_at', { ascending: false });
 
@@ -32,8 +32,8 @@ export async function getProductById(id: string) {
     .from('products')
     .select(`
       *,
-      main_category_data:categories!products_main_category_fkey(id, name, slug),
-      sub_category_data:categories!products_sub_category_fkey(id, name, slug)
+      main_category_data:categories!main_category(id, name, slug),
+      sub_category_data:categories!sub_category(id, name, slug)
     `)
     .eq('id', id)
     .single();
@@ -94,16 +94,19 @@ export async function updateProduct(id: string, product: any) {
       return null;
     }
 
-    // Handle numeric fields
+    // Remove joined data fields that are not actual database columns
+    const { main_category_data, sub_category_data, created_at, updated_at, ...productData } = product;
+
+    // Handle numeric fields and clean the data
     const cleanedProduct = {
-      ...product,
-      price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
-      price_min: typeof product.price_min === 'string' ? parseFloat(product.price_min) : product.price_min,
-      price_max: typeof product.price_max === 'string' ? parseFloat(product.price_max) : product.price_max,
-      moq: product.moq ? (typeof product.moq === 'string' ? parseFloat(product.moq) : product.moq) : null,
+      ...productData,
+      price: typeof productData.price === 'string' ? parseFloat(productData.price) : productData.price,
+      price_min: typeof productData.price_min === 'string' ? parseFloat(productData.price_min) : productData.price_min,
+      price_max: typeof productData.price_max === 'string' ? parseFloat(productData.price_max) : productData.price_max,
+      moq: productData.moq ? (typeof productData.moq === 'string' ? parseFloat(productData.moq) : productData.moq) : null,
       // Ensure display_image and hover_image are properly handled
-      display_image: 'display_image' in product ? product.display_image : undefined,
-      hover_image: 'hover_image' in product ? product.hover_image : undefined
+      display_image: 'display_image' in productData ? productData.display_image : undefined,
+      hover_image: 'hover_image' in productData ? productData.hover_image : undefined
     };
 
     console.log('Updating product with data:', JSON.stringify(cleanedProduct));
@@ -112,7 +115,11 @@ export async function updateProduct(id: string, product: any) {
       .from('products')
       .update(cleanedProduct)
       .eq('id', id)
-      .select()
+      .select(`
+        *,
+        main_category_data:categories!main_category(id, name, slug),
+        sub_category_data:categories!sub_category(id, name, slug)
+      `)
       .single();
 
     if (error) {
@@ -270,8 +277,8 @@ export async function getQuoteProductDetails(quoteData: any) {
     .from('products')
     .select(`
       *,
-      main_category_data:categories!products_main_category_fkey(id, name, slug),
-      sub_category_data:categories!products_sub_category_fkey(id, name, slug)
+      main_category_data:categories!main_category(id, name, slug),
+      sub_category_data:categories!sub_category(id, name, slug)
     `)
     .in('id', productIds);
 

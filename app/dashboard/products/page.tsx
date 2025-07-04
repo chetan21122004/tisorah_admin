@@ -129,8 +129,7 @@ export default function ProductsPage() {
             </div>
           ) : (
             filteredProducts.map((product) => (
-              <Link href={`/dashboard/products/${product.id}`} key={product.id}>
-                <Card className="overflow-hidden border-neutral-200 bg-white hover:border-secondary/50 transition-colors group">
+              <Card key={product.id} className="overflow-hidden border-neutral-200 bg-white hover:border-secondary/50 transition-colors group">
                   <div className="aspect-square w-full bg-neutral-100 relative overflow-hidden">
                     {product.images && product.images.length > 0 ? (
                       <>
@@ -161,7 +160,9 @@ export default function ProductsPage() {
                   <CardContent className="p-4">
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <h3 className="font-medium truncate">{product.name}</h3>
+                        <Link href={`/dashboard/products/${product.id}`}>
+                          <h3 className="font-medium truncate hover:text-primary cursor-pointer">{product.name}</h3>
+                        </Link>
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {product.main_category_data?.name || 'Uncategorized'}
@@ -173,27 +174,28 @@ export default function ProductsPage() {
                             ? `₹${product.price_min.toLocaleString('en-IN')} - ₹${product.price_max.toLocaleString('en-IN')}`
                             : `₹${product.price.toLocaleString('en-IN')}`}
                         </div>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                          <span className="sr-only">Edit product</span>
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="h-4 w-4"
-                          >
-                            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                            <path d="m15 5 4 4" />
-                          </svg>
-                        </Button>
+                        <Link href={`/dashboard/products/${product.id}?edit=true`}>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <span className="sr-only">Edit product</span>
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="h-4 w-4"
+                            >
+                              <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                              <path d="m15 5 4 4" />
+                            </svg>
+                          </Button>
+                        </Link>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
-              </Link>
             ))
           )}
         </div>
