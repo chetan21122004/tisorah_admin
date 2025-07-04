@@ -1,0 +1,54 @@
+/* Patterns */
+.pattern-dots {
+  background-image: radial-gradient(#AD9660 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.pattern-lines {
+  background-image: linear-gradient(to right, #AD9660 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.pattern-grid {
+  background-image: linear-gradient(to right, #AD9660 1px, transparent 1px),
+    linear-gradient(to bottom, #AD9660 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.pattern-waves {
+  background-image: url("data:image/svg+xml,%3Csvg width='100' height='20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0,10 Q25,5 50,10 T100,10' stroke='%23AD9660' fill='none' stroke-width='0.5' /%3E%3C/svg%3E");
+}
+
+.pattern-diamonds {
+  background-image: url("data:image/svg+xml,%3Csvg width='20' height='20' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='5' y='5' width='10' height='10' transform='rotate(45 10 10)' stroke='%23AD9660' fill='none' stroke-width='0.5' /%3E%3C/svg%3E");
+}
+
+/* Opacity variants */
+.pattern-opacity-5 {
+  opacity: 0.05;
+}
+
+.pattern-opacity-10 {
+  opacity: 0.1;
+}
+
+.pattern-opacity-20 {
+  opacity: 0.2;
+}
+
+/* Color variants */
+.pattern-primary {
+  --pattern-color: #323433;
+}
+
+.pattern-secondary {
+  --pattern-color: #AD9660;
+}
+
+.pattern-accent {
+  --pattern-color: #1E2A47;
+}
+
+.pattern-neutral {
+  --pattern-color: #E6E2DD;
+} 
