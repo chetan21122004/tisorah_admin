@@ -17,7 +17,7 @@ import {
   SidebarMenuItem,
   SidebarProvider,
 } from "@/components/ui/sidebar"
-import { Box, Gift, ImageIcon, LayoutDashboard, Menu, MessageSquare, Quote, Settings, Users, PackageOpen, FileText } from "lucide-react"
+import { Box, Gift, ImageIcon, LayoutDashboard, Menu, MessageSquare, Quote, Settings, Users, PackageOpen, FileText, BookOpen } from "lucide-react"
 
 const sidebarItems = [
   {
@@ -30,11 +30,7 @@ const sidebarItems = [
     href: "/dashboard/products",
     icon: Gift,
   },
-  {
-    title: "Categories",
-    href: "/dashboard/categories",
-    icon: PackageOpen,
-  },
+ 
   {
     title: "Quote Requests",
     href: "/dashboard/quotes",
@@ -45,20 +41,16 @@ const sidebarItems = [
     href: "/dashboard/testimonials",
     icon: MessageSquare,
   },
-  {
-    title: "Portfolio",
-    href: "/dashboard/portfolio",
-    icon: ImageIcon,
-  },
+ 
   {
     title: "FAQs",
     href: "/dashboard/faqs",
     icon: FileText,
   },
   {
-    title: "Customers",
-    href: "/dashboard/customers",
-    icon: Users,
+    title: "Blogs",
+    href: "/dashboard/blogs",
+    icon: BookOpen,
   },
   {
     title: "Settings",

@@ -148,6 +148,54 @@ export async function deleteProduct(id: string) {
   return true;
 }
 
+// Products with pagination, filtering, and sorting
+export async function getProductsPaginated(
+  page = 1,
+  limit = 20,
+  search = '',
+  category = '',
+  sortBy = 'created_at',
+  sortOrder = 'desc'
+) {
+  let query = supabase
+    .from('products')
+    .select(`
+      *,
+      main_category_data:categories!main_category(id, name, slug),
+      sub_category_data:categories!sub_category(id, name, slug)
+    `, { count: 'exact' });
+
+  // Apply search filter
+  if (search) {
+    query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
+  }
+
+  // Apply category filter
+  if (category) {
+    query = query.eq('main_category', category);
+  }
+
+  // Apply sorting
+  query = query.order(sortBy, { ascending: sortOrder === 'asc' });
+
+  // Apply pagination
+  const offset = (page - 1) * limit;
+  query = query.range(offset, offset + limit - 1);
+
+  const { data, error, count } = await query;
+
+  if (error) {
+    console.error('Error fetching products:', error);
+    return { products: [], total: 0, hasMore: false };
+  }
+
+  return {
+    products: data || [],
+    total: count || 0,
+    hasMore: (count || 0) > page * limit
+  };
+}
+
 // Categories
 export async function getCategories() {
   const { data, error } = await supabase

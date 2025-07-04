@@ -159,18 +159,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     try {
       const sanitizedImages = sanitizeImages(formData.images)
       
-      // Prepare display and hover image values
-      let displayImage = formData.display_image || null
-      let hoverImage = formData.hover_image || null
-      
-      // If selected from gallery but not already set
-      if (selectedDisplayImageIndex !== null && sanitizedImages && sanitizedImages.length > selectedDisplayImageIndex) {
-        displayImage = sanitizedImages[selectedDisplayImageIndex]
-      }
-      
-      if (selectedHoverImageIndex !== null && sanitizedImages && sanitizedImages.length > selectedHoverImageIndex) {
-        hoverImage = sanitizedImages[selectedHoverImageIndex]
-      }
+      // Use first image as display image if available
+      let displayImage = sanitizedImages && sanitizedImages.length > 0 ? sanitizedImages[0] : null
+      let hoverImage = sanitizedImages && sanitizedImages.length > 1 ? sanitizedImages[1] : null
       
       // Create the base product data
       const productData: any = {
@@ -435,66 +426,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                           >
                             <X className="w-4 h-4" />
                           </button>
-                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <div className="flex gap-1">
-                              <button
-                                type="button"
-                                onClick={() => setSelectedDisplayImageIndex(idx)}
-                                className={`text-xs px-2 py-1 rounded ${
-                                  selectedDisplayImageIndex === idx 
-                                    ? 'bg-green-500 text-white' 
-                                    : 'bg-white/20 text-white hover:bg-white/30'
-                                }`}
-                              >
-                                {selectedDisplayImageIndex === idx ? '✓ Display' : 'Display'}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setSelectedHoverImageIndex(idx)}
-                                className={`text-xs px-2 py-1 rounded ${
-                                  selectedHoverImageIndex === idx 
-                                    ? 'bg-blue-500 text-white' 
-                                    : 'bg-white/20 text-white hover:bg-white/30'
-                                }`}
-                              >
-                                {selectedHoverImageIndex === idx ? '✓ Hover' : 'Hover'}
-                              </button>
-                            </div>
-                          </div>
+
                         </div>
                       ))}
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-slate-200">
-                      <div>
-                        <Label className="text-sm font-medium text-slate-700 mb-2 block">Display Image Preview</Label>
-                        <div className="aspect-video bg-slate-50 rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden">
-                          {selectedDisplayImageIndex !== null && formData.images && formData.images.length > selectedDisplayImageIndex ? (
-                            <img src={formData.images[selectedDisplayImageIndex]} alt="Display image" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="text-center">
-                              <ImageIcon className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                              <p className="text-sm text-slate-500">No display image selected</p>
-                            </div>
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-500 mt-2">This image appears first on product cards</p>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-slate-700 mb-2 block">Hover Image Preview</Label>
-                        <div className="aspect-video bg-slate-50 rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden">
-                          {selectedHoverImageIndex !== null && formData.images && formData.images.length > selectedHoverImageIndex ? (
-                            <img src={formData.images[selectedHoverImageIndex]} alt="Hover image" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="text-center">
-                              <ImageIcon className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                              <p className="text-sm text-slate-500">No hover image selected</p>
-                            </div>
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-500 mt-2">This image appears when hovering over product cards</p>
-                      </div>
-                    </div>
+
                   </div>
                 ) : (
                   <div className="text-center py-12">

@@ -1,11 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
-import { Filter, Plus, Search, SlidersHorizontal } from "lucide-react"
-import { getProducts } from "@/lib/supabase"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Filter, Plus, Search, SlidersHorizontal, Loader2 } from "lucide-react"
+import { getProductsPaginated, getCategories } from "@/lib/supabase"
+import { toast } from "sonner"
 import Link from "next/link"
 
 interface Product {
@@ -35,31 +37,122 @@ interface Product {
   } | null
 }
 
+interface Category {
+  id: string
+  name: string
+  slug: string
+  parent_id: string | null
+}
+
 export default function ProductsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [products, setProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
-  
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [page, setPage] = useState(1)
+  const [selectedCategory, setSelectedCategory] = useState("")
+  const [sortBy, setSortBy] = useState("created_at")
+  const [sortOrder, setSortOrder] = useState("desc")
+  const [showFilters, setShowFilters] = useState(false)
+  const observerRef = useRef<HTMLDivElement>(null)
+
+  // Load initial data
   useEffect(() => {
-    async function loadProducts() {
+    async function loadInitialData() {
       try {
-        const data = await getProducts()
-        setProducts((data as unknown) as Product[])
+        const [productsData, categoriesData] = await Promise.all([
+          getProductsPaginated(1, 20, searchTerm, selectedCategory, sortBy, sortOrder),
+          getCategories()
+        ])
+        
+        setProducts(productsData.products as Product[])
+        setHasMore(productsData.hasMore)
+        setCategories(categoriesData as Category[])
       } catch (error) {
-        console.error("Error loading products:", error)
+        console.error("Error loading initial data:", error)
+        toast.error("Failed to load products")
       } finally {
         setLoading(false)
       }
     }
     
-    loadProducts()
+    loadInitialData()
   }, [])
-  
-  const filteredProducts = products.filter(product => 
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (product.main_category_data?.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (product.sub_category_data?.name || "").toLowerCase().includes(searchTerm.toLowerCase())
-  )
+
+  // Load more products when filters change
+  useEffect(() => {
+    if (loading) return
+
+    const loadFilteredProducts = async () => {
+      setLoading(true)
+      try {
+        const productsData = await getProductsPaginated(1, 20, searchTerm, selectedCategory, sortBy, sortOrder)
+        setProducts(productsData.products as Product[])
+        setHasMore(productsData.hasMore)
+        setPage(1)
+      } catch (error) {
+        console.error("Error loading filtered products:", error)
+        toast.error("Failed to load products")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    const debounceTimer = setTimeout(loadFilteredProducts, 300)
+    return () => clearTimeout(debounceTimer)
+  }, [searchTerm, selectedCategory, sortBy, sortOrder])
+
+  // Load more products for pagination
+  const loadMoreProducts = useCallback(async () => {
+    if (loadingMore || !hasMore) return
+
+    setLoadingMore(true)
+    try {
+      const nextPage = page + 1
+      const productsData = await getProductsPaginated(nextPage, 20, searchTerm, selectedCategory, sortBy, sortOrder)
+      
+      setProducts(prev => [...prev, ...productsData.products as Product[]])
+      setHasMore(productsData.hasMore)
+      setPage(nextPage)
+    } catch (error) {
+      console.error("Error loading more products:", error)
+      toast.error("Failed to load more products")
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [page, hasMore, loadingMore, searchTerm, selectedCategory, sortBy, sortOrder])
+
+  // Intersection observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore) {
+          loadMoreProducts()
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    if (observerRef.current) {
+      observer.observe(observerRef.current)
+    }
+
+    return () => observer.disconnect()
+  }, [loadMoreProducts, hasMore, loadingMore])
+
+  const mainCategories = categories.filter(cat => !cat.parent_id)
+
+  const handleCategoryChange = (value: string) => {
+    setSelectedCategory(value === "all" ? "" : value)
+  }
+
+  const handleSortChange = (value: string) => {
+    const [field, order] = value.split("-")
+    setSortBy(field)
+    setSortOrder(order)
+  }
 
   return (
     <div className="space-y-8 relative">
@@ -92,20 +185,70 @@ export default function ProductsPage() {
           />
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="bg-white border-neutral-200">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="bg-white border-neutral-200"
+            onClick={() => setShowFilters(!showFilters)}
+          >
             <Filter className="mr-2 h-4 w-4" />
             Filter
           </Button>
-          <Button variant="outline" size="sm" className="bg-white border-neutral-200">
-            <SlidersHorizontal className="mr-2 h-4 w-4" />
-            Sort
-          </Button>
+          <Select value={`${sortBy}-${sortOrder}`} onValueChange={handleSortChange}>
+            <SelectTrigger className="w-40 bg-white border-neutral-200">
+              <SlidersHorizontal className="mr-2 h-4 w-4" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="created_at-desc">Newest First</SelectItem>
+              <SelectItem value="created_at-asc">Oldest First</SelectItem>
+              <SelectItem value="name-asc">Name A-Z</SelectItem>
+              <SelectItem value="name-desc">Name Z-A</SelectItem>
+              <SelectItem value="price-asc">Price Low-High</SelectItem>
+              <SelectItem value="price-desc">Price High-Low</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
+      {showFilters && (
+        <div className="bg-white p-4 rounded-lg border border-neutral-200 shadow-sm">
+          <div className="flex flex-wrap gap-4 items-center">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium">Category:</label>
+              <Select value={selectedCategory || "all"} onValueChange={handleCategoryChange}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="All Categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {mainCategories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => {
+                setSelectedCategory("")
+                setSearchTerm("")
+                setSortBy("created_at")
+                setSortOrder("desc")
+              }}
+            >
+              Clear Filters
+            </Button>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {[1, 2, 3, 4, 5, 6, 8].map((item) => (
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((item) => (
             <Card key={item} className="overflow-hidden border-neutral-200 bg-white">
               <div className="aspect-square w-full bg-neutral-100 animate-pulse" />
               <CardContent className="p-4">
@@ -122,14 +265,15 @@ export default function ProductsPage() {
           ))}
         </div>
       ) : (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filteredProducts.length === 0 ? (
-            <div className="col-span-full text-center py-12">
-              <p className="text-muted-foreground">No products found. Try adjusting your search.</p>
-            </div>
-          ) : (
-            filteredProducts.map((product) => (
-              <Card key={product.id} className="overflow-hidden border-neutral-200 bg-white hover:border-secondary/50 transition-colors group">
+        <>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {products.length === 0 ? (
+              <div className="col-span-full text-center py-12">
+                <p className="text-muted-foreground">No products found. Try adjusting your search or filters.</p>
+              </div>
+            ) : (
+              products.map((product) => (
+                <Card key={product.id} className="overflow-hidden border-neutral-200 bg-white hover:border-secondary/50 transition-colors group">
                   <div className="aspect-square w-full bg-neutral-100 relative overflow-hidden">
                     {product.images && product.images.length > 0 ? (
                       <>
@@ -196,9 +340,28 @@ export default function ProductsPage() {
                     </div>
                   </CardContent>
                 </Card>
-            ))
+              ))
+            )}
+          </div>
+          
+          {/* Infinite scroll trigger */}
+          {hasMore && (
+            <div ref={observerRef} className="flex justify-center py-8">
+              {loadingMore && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading more products...
+                </div>
+              )}
+            </div>
           )}
-        </div>
+          
+          {!hasMore && products.length > 0 && (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">You've reached the end of the products list.</p>
+            </div>
+          )}
+        </>
       )}
     </div>
   )
