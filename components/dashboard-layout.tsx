@@ -4,7 +4,8 @@ import type React from "react"
 
 import { useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import {
@@ -17,7 +18,23 @@ import {
   SidebarMenuItem,
   SidebarProvider,
 } from "@/components/ui/sidebar"
-import { Box, Gift, ImageIcon, LayoutDashboard, Menu, MessageSquare, Quote, Settings, Users, PackageOpen, FileText, BookOpen } from "lucide-react"
+import { 
+  Box, 
+  Gift, 
+  ImageIcon, 
+  LayoutDashboard, 
+  Menu, 
+  MessageSquare, 
+  Quote, 
+  Settings, 
+  Users, 
+  PackageOpen, 
+  FileText, 
+  BookOpen,
+  LogOut,
+  User
+} from "lucide-react"
+import { toast } from "sonner"
 
 const sidebarItems = [
   {
@@ -61,7 +78,15 @@ const sidebarItems = [
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const router = useRouter()
+  const { logout } = useAuth()
   const [open, setOpen] = useState(false)
+
+  const handleLogout = () => {
+    logout()
+    toast.success('Logged out successfully')
+    router.push('/login')
+  }
 
   return (
     <SidebarProvider defaultOpen>
@@ -98,6 +123,16 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                     </Link>
                   ))}
                 </nav>
+                <div className="mt-auto p-2">
+                  <Button
+                    variant="ghost"
+                    onClick={handleLogout}
+                    className="w-full justify-start text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                  >
+                    <LogOut className="h-4 w-4 mr-3" />
+                    Logout
+                  </Button>
+                </div>
               </div>
             </SheetContent>
           </Sheet>
@@ -107,9 +142,15 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               <span className="text-xs text-muted-foreground">ADMIN</span>
             </Link>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="rounded-full">
-                <Settings className="h-5 w-5" />
-                <span className="sr-only">Settings</span>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="rounded-full"
+                onClick={handleLogout}
+                title="Logout"
+              >
+                <LogOut className="h-5 w-5" />
+                <span className="sr-only">Logout</span>
               </Button>
             </div>
           </div>
@@ -137,8 +178,21 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 ))}
               </SidebarMenu>
             </SidebarContent>
-            <SidebarFooter className="border-t border-neutral-200 p-4">
-              <div className="text-sm text-muted-foreground">Tisorah Admin v1.0</div>
+            <SidebarFooter className="border-t border-neutral-200 p-4 space-y-2">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <User className="h-4 w-4" />
+                <span>tisorah-admin</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLogout}
+                className="w-full justify-start text-muted-foreground hover:text-red-600 hover:bg-red-50"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
+              <div className="text-xs text-muted-foreground">Tisorah Admin v1.0</div>
             </SidebarFooter>
           </Sidebar>
           {/* Main content */}

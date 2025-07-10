@@ -3,6 +3,8 @@ import type { Metadata } from "next"
 import { Poppins, Frank_Ruhl_Libre } from "next/font/google"
 import "./globals.css"
 import "@/styles/patterns.css"
+import { AuthProvider } from "@/components/auth-provider"
+import { Toaster } from "@/components/ui/sonner"
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -29,7 +31,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${poppins.variable} ${frankRuhlLibre.variable} font-sans antialiased`}>
-        {children}
+        <AuthProvider>
+          {children}
+          <Toaster />
+        </AuthProvider>
       </body>
     </html>
   )
