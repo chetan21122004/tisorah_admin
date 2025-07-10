@@ -22,17 +22,100 @@ interface Category {
   name: string
   slug: string
   parent_id: string | null
+  type: 'edible' | 'non_edible'
+  level: 'main' | 'primary' | 'secondary'
+  description?: string
+  image_url?: string | null
+  created_at?: string | null
+  updated_at?: string | null
+  count?: number | null
+}
+
+interface CategoryFromAPI {
+  id: string
+  name: string
+  slug: string
+  parent_id: string | null
+  type: 'edible' | 'non_edible' | null
+  level: 'main' | 'primary' | 'secondary' | null
+  description: string | null
+  image_url: string | null
+  created_at: string | null
+  updated_at: string | null
+  count: number | null
+}
+
+interface ProductFormData {
+  id?: string
+  name: string
+  description?: string
+  price: number
+  price_min: number | null
+  price_max: number | null
+  has_price_range: boolean | null
+  images: string[] | null
+  display_image: string | null
+  hover_image: string | null
+  featured: boolean | null
+  customizable: boolean | null
+  created_at: string | null
+  main_category: string | null
+  primary_category: string | null
+  secondary_category: string | null
+  moq: number | null
+  delivery?: string | null
+  main_category_data?: {
+    id: string
+    name: string
+    slug: string
+    type: 'edible' | 'non_edible'
+    level: 'main'
+  } | null
+  primary_category_data?: {
+    id: string
+    name: string
+    slug: string
+    type: 'edible' | 'non_edible'
+    level: 'primary'
+    description?: string
+  } | null
+  secondary_category_data?: {
+    id: string
+    name: string
+    slug: string
+    type: 'edible' | 'non_edible'
+    level: 'secondary'
+    description?: string
+  } | null
 }
 
 export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [product, setProduct] = useState<any>(null)
-  const [categories, setCategories] = useState<any[]>([])
+  const [product, setProduct] = useState<ProductFormData | null>(null)
+  const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [editMode, setEditMode] = useState(false)
-  const [formData, setFormData] = useState<any>({})
+  const [formData, setFormData] = useState<ProductFormData>({
+    name: '',
+    description: '',
+    price: 0,
+    price_min: null,
+    price_max: null,
+    has_price_range: null,
+    images: null,
+    display_image: null,
+    hover_image: null,
+    featured: null,
+    customizable: null,
+    created_at: null,
+    main_category: null,
+    primary_category: null,
+    secondary_category: null,
+    moq: null,
+    delivery: null
+  })
   const [deleting, setDeleting] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [imageUploading, setImageUploading] = useState(false)
@@ -50,50 +133,120 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     }
   }, [searchParams])
 
-  // Get parent categories (no parent_id)
-  const mainCategories = categories.filter(cat => !cat.parent_id)
-  // Get subcategories for the selected main category
-  const subCategories = categories.filter(cat => cat.parent_id === formData.main_category)
+  // Get categories by level
+  const mainCategories = categories.filter(cat => cat.level === 'main')
+  const primaryCategories = categories.filter(cat => 
+    cat.level === 'primary' && 
+    cat.parent_id === formData.main_category
+  )
+  const secondaryCategories = categories.filter(cat => 
+    cat.level === 'secondary' && 
+    cat.parent_id === formData.primary_category
+  )
+
+  // Get category type for the selected main category
+  const selectedMainCategory = categories.find(cat => cat.id === formData.main_category)
+  const categoryType = selectedMainCategory?.type || null
 
   useEffect(() => {
     async function loadData() {
       setLoading(true)
-      const prod = await getProductById(id)
-      const cats = await getCategories()
-      
-      if (prod) {
-        // Set initial display and hover image indices if they exist
-        if (prod.display_image && prod.images) {
-          const displayIndex = prod.images.findIndex(img => img === prod.display_image)
-          if (displayIndex >= 0) {
-            setSelectedDisplayImageIndex(displayIndex)
+      try {
+        const prod = await getProductById(id)
+        const categoriesData = await getCategories()
+        
+        // Filter out any categories with invalid type or level and convert to proper Category type
+        const validCategories = categoriesData
+          .filter((cat: CategoryFromAPI) => 
+            cat.type && cat.level && 
+            (cat.type === 'edible' || cat.type === 'non_edible') &&
+            (cat.level === 'main' || cat.level === 'primary' || cat.level === 'secondary')
+          )
+          .map((cat: CategoryFromAPI): Category => ({
+            id: cat.id,
+            name: cat.name,
+            slug: cat.slug,
+            parent_id: cat.parent_id,
+            type: cat.type as 'edible' | 'non_edible',
+            level: cat.level as 'main' | 'primary' | 'secondary',
+            description: cat.description || undefined,
+            image_url: cat.image_url,
+            created_at: cat.created_at,
+            updated_at: cat.updated_at,
+            count: cat.count
+          }))
+        
+        if (prod) {
+          // Set initial display and hover image indices if they exist
+          if (prod.display_image && prod.images) {
+            const displayIndex = prod.images.findIndex(img => img === prod.display_image)
+            if (displayIndex >= 0) {
+              setSelectedDisplayImageIndex(displayIndex)
+            }
           }
-        }
-        
-        if (prod.hover_image && prod.images) {
-          const hoverIndex = prod.images.findIndex(img => img === prod.hover_image)
-          if (hoverIndex >= 0) {
-            setSelectedHoverImageIndex(hoverIndex)
+          
+          if (prod.hover_image && prod.images) {
+            const hoverIndex = prod.images.findIndex(img => img === prod.hover_image)
+            if (hoverIndex >= 0) {
+              setSelectedHoverImageIndex(hoverIndex)
+            }
           }
+          
+          // Ensure has_price_range is set to true and convert to ProductFormData
+          const updatedProd: ProductFormData = {
+            ...prod,
+            has_price_range: true,
+            // If price range is not set, initialize it with the single price
+            price_min: prod.price_min !== undefined ? prod.price_min : prod.price,
+            price_max: prod.price_max !== undefined ? prod.price_max : prod.price,
+            // Ensure all required fields are present
+            name: prod.name || '',
+            price: prod.price || 0,
+            images: prod.images || null,
+            display_image: prod.display_image || null,
+            hover_image: prod.hover_image || null,
+            featured: prod.featured || null,
+            customizable: prod.customizable || null,
+            created_at: prod.created_at || null,
+            main_category: prod.main_category || null,
+            primary_category: prod.primary_category || null,
+            secondary_category: prod.secondary_category || null,
+            moq: prod.moq || null,
+            delivery: prod.delivery || null,
+            description: prod.description || ''
+          }
+          
+          setProduct(updatedProd)
+          setFormData(updatedProd)
+        } else {
+          setProduct(null)
+          setFormData({
+            name: '',
+            description: '',
+            price: 0,
+            price_min: null,
+            price_max: null,
+            has_price_range: null,
+            images: null,
+            display_image: null,
+            hover_image: null,
+            featured: null,
+            customizable: null,
+            created_at: null,
+            main_category: null,
+            primary_category: null,
+            secondary_category: null,
+            moq: null,
+            delivery: null
+          })
         }
-        
-        // Ensure has_price_range is set to true
-        const updatedProd = {
-          ...prod,
-          has_price_range: true,
-          // If price range is not set, initialize it with the single price
-          price_min: prod.price_min !== undefined ? prod.price_min : prod.price,
-          price_max: prod.price_max !== undefined ? prod.price_max : prod.price
-        }
-        
-        setProduct(updatedProd)
-        setFormData(updatedProd)
-      } else {
-        setProduct(null)
-        setFormData({})
+        setCategories(validCategories)
+      } catch (error) {
+        console.error('Error loading data:', error)
+        toast.error('Failed to load product data')
+      } finally {
+        setLoading(false)
       }
-      setCategories(cats)
-      setLoading(false)
     }
     loadData()
   }, [id])
@@ -106,11 +259,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
-    setFormData((prev: any) => ({ ...prev, [name]: value }))
+    setFormData((prev: ProductFormData) => ({ ...prev, [name]: value }))
   }
 
   const handleCheckboxChange = (name: string, checked: boolean | "indeterminate") => {
-    setFormData((prev: any) => ({ ...prev, [name]: checked }))
+    setFormData((prev: ProductFormData) => ({ ...prev, [name]: checked }))
   }
 
   const handleSelectChange = (name: string, value: string) => {
@@ -118,17 +271,22 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     const actualValue = value === "none" ? null : value;
     
     if (name === 'main_category') {
-      // Reset sub_category when main_category changes if it's a child of previous main category
-      const currentSubCategory = formData.sub_category;
-      const currentSubCategoryParent = categories.find(c => c.id === currentSubCategory)?.parent_id;
-      
-      if (!currentSubCategory || currentSubCategoryParent === formData.main_category) {
-        setFormData((prev: any) => ({ ...prev, [name]: actualValue, sub_category: null }))
-      } else {
-        setFormData((prev: any) => ({ ...prev, [name]: actualValue }))
-      }
+      // Reset primary and secondary categories when main category changes
+      setFormData((prev: ProductFormData) => ({ 
+        ...prev, 
+        [name]: actualValue,
+        primary_category: null,
+        secondary_category: null 
+      }))
+    } else if (name === 'primary_category') {
+      // Reset secondary category when primary category changes
+      setFormData((prev: ProductFormData) => ({ 
+        ...prev, 
+        [name]: actualValue,
+        secondary_category: null 
+      }))
     } else {
-      setFormData((prev: any) => ({ ...prev, [name]: actualValue }))
+      setFormData((prev: ProductFormData) => ({ ...prev, [name]: actualValue }))
     }
   }
 
@@ -191,7 +349,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
       if (updated) {
         setSuccessMsg("Product updated successfully")
-        setProduct(updated)
+        setProduct(updated as ProductFormData)
+        setFormData(updated as ProductFormData)
         setEditMode(false)
         toast.success("Product updated successfully")
         // Remove edit parameter from URL
@@ -235,12 +394,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     try {
       const newUrls = await uploadMultipleImages(Array.from(e.target.files))
       const updatedImages = sanitizeImages([...(formData.images || []), ...newUrls])
-      setFormData((prev: any) => ({ ...prev, images: updatedImages }))
+      setFormData((prev: ProductFormData) => ({ ...prev, images: updatedImages }))
       // Save to DB
       const updated = await updateProduct(id, { ...formData, images: updatedImages })
       if (updated) {
-        setProduct(updated)
-        setFormData(updated)
+        setProduct(updated as ProductFormData)
+        setFormData(updated as ProductFormData)
         toast.success("Images uploaded successfully!")
       }
     } catch (err: any) {
@@ -259,12 +418,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     try {
       await deleteImage(imgUrl)
       const updatedImages = sanitizeImages((formData.images || []).filter((url: string) => url !== imgUrl))
-      setFormData((prev: any) => ({ ...prev, images: updatedImages }))
+      setFormData((prev: ProductFormData) => ({ ...prev, images: updatedImages }))
       // Save to DB
       const updated = await updateProduct(id, { ...formData, images: updatedImages })
       if (updated) {
-        setProduct(updated)
-        setFormData(updated)
+        setProduct(updated as ProductFormData)
+        setFormData(updated as ProductFormData)
         toast.success("Image deleted successfully!")
       }
     } catch (err: any) {
@@ -273,6 +432,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     } finally {
       setImageUploading(false)
     }
+  }
+
+  const formatPrice = (price: number | null): string => {
+    if (!price) return '0'
+    return price.toLocaleString('en-IN')
   }
 
   if (loading) {
@@ -517,35 +681,94 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="main_category" className="text-sm font-medium text-slate-700">Main Category *</Label>
-                    <Select value={formData.main_category || "none"} onValueChange={(v: string) => handleSelectChange("main_category", v)}>
-                      <SelectTrigger className="bg-white border-slate-300 focus:border-primary focus:ring-primary">
+                {/* Categories Section */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div className="space-y-2.5">
+                    <Label htmlFor="main_category" className="text-sm font-medium">Main Category <span className="text-red-500">*</span></Label>
+                    <Select 
+                      value={formData.main_category || "none"} 
+                      onValueChange={(value) => handleSelectChange("main_category", value)}
+                      disabled={!editMode}
+                    >
+                      <SelectTrigger className="h-10 bg-white border-neutral-200 focus:ring-primary/20">
                         <SelectValue placeholder="Select main category" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">None</SelectItem>
-                        {mainCategories.map((cat: any) => (
-                          <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                        {mainCategories.map((category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            {category.name} ({category.type === 'edible' ? 'Edible' : 'Non-Edible'})
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    {categoryType && (
+                      <p className="text-sm text-slate-500 mt-1">
+                        Selected category type: {categoryType === 'edible' ? 'Edible Gifts' : 'Non-Edible Gifts'}
+                      </p>
+                    )}
                   </div>
                   
-                  <div className="space-y-2">
-                    <Label htmlFor="sub_category" className="text-sm font-medium text-slate-700">Sub Category</Label>
-                    <Select value={formData.sub_category || "none"} onValueChange={(v: string) => handleSelectChange("sub_category", v)} disabled={!formData.main_category || subCategories.length === 0}>
-                      <SelectTrigger className="bg-white border-slate-300 focus:border-primary focus:ring-primary">
-                        <SelectValue placeholder="Select sub category" />
+                  <div className="space-y-2.5">
+                    <Label htmlFor="primary_category" className="text-sm font-medium">Primary Category</Label>
+                    <Select 
+                      value={formData.primary_category || "none"}
+                      onValueChange={(value) => handleSelectChange("primary_category", value)}
+                      disabled={!editMode || !formData.main_category || primaryCategories.length === 0}
+                    >
+                      <SelectTrigger className="h-10 bg-white border-neutral-200 focus:ring-primary/20">
+                        <SelectValue placeholder="Select primary category" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">None</SelectItem>
-                        {subCategories.map((cat: any) => (
-                          <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                        {primaryCategories.map((category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            {category.name}
+                            {category.description && (
+                              <span className="block text-xs text-slate-500 mt-0.5">
+                                {category.description}
+                              </span>
+                            )}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    {formData.primary_category && (
+                      <p className="text-sm text-slate-500 mt-1">
+                        {categories.find(cat => cat.id === formData.primary_category)?.description}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2.5">
+                    <Label htmlFor="secondary_category" className="text-sm font-medium">Secondary Category</Label>
+                    <Select 
+                      value={formData.secondary_category || "none"}
+                      onValueChange={(value) => handleSelectChange("secondary_category", value)}
+                      disabled={!editMode || !formData.primary_category || secondaryCategories.length === 0}
+                    >
+                      <SelectTrigger className="h-10 bg-white border-neutral-200 focus:ring-primary/20">
+                        <SelectValue placeholder="Select secondary category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {secondaryCategories.map((category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            {category.name}
+                            {category.description && (
+                              <span className="block text-xs text-slate-500 mt-0.5">
+                                {category.description}
+                              </span>
+                            )}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {formData.secondary_category && (
+                      <p className="text-sm text-slate-500 mt-1">
+                        {categories.find(cat => cat.id === formData.secondary_category)?.description}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -601,7 +824,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 variant="outline" 
                 onClick={() => {
                   setEditMode(false)
-                  setFormData(product)
+                  setFormData(product as ProductFormData)
                   // Remove edit parameter from URL
                   const url = new URL(window.location.href)
                   url.searchParams.delete('edit')
@@ -674,13 +897,18 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                             Customizable
                           </Badge>
                         )}
+                        {product.main_category_data?.type && (
+                          <Badge variant="outline" className={product.main_category_data.type === 'edible' ? 'border-green-500 text-green-500' : 'border-blue-500 text-blue-500'}>
+                            {product.main_category_data.type === 'edible' ? 'Edible Gift' : 'Non-Edible Gift'}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   </div>
                   <div className="text-3xl font-bold text-primary">
                     {product.has_price_range 
-                      ? `₹${Number(product.price_min).toLocaleString('en-IN')} - ₹${Number(product.price_max).toLocaleString('en-IN')}` 
-                      : `₹${Number(product.price).toLocaleString('en-IN')}`}
+                      ? `₹${formatPrice(Number(product.price_min))} - ₹${formatPrice(Number(product.price_max))}` 
+                      : `₹${formatPrice(Number(product.price))}`}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -691,8 +919,22 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                         <p className="text-sm text-slate-500">Category</p>
                         <p className="font-medium text-slate-800">
                           {product.main_category_data?.name || 'Uncategorized'}
-                          {product.sub_category_data?.name && ` / ${product.sub_category_data.name}`}
+                          {product.primary_category_data?.name && (
+                            <>
+                              <span className="mx-2">→</span>
+                              {product.primary_category_data.name}
+                            </>
+                          )}
+                          {product.secondary_category_data?.name && (
+                            <>
+                              <span className="mx-2">→</span>
+                              {product.secondary_category_data.name}
+                            </>
+                          )}
                         </p>
+                        {product.secondary_category_data?.description && (
+                          <p className="text-sm text-slate-500 mt-1">{product.secondary_category_data.description}</p>
+                        )}
                       </div>
                     </div>
                     

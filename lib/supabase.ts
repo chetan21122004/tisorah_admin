@@ -14,8 +14,9 @@ export async function getProducts() {
     .from('products')
     .select(`
       *,
-      main_category_data:categories!main_category(id, name, slug),
-      sub_category_data:categories!sub_category(id, name, slug)
+      main_category_data:categories!main_category(id, name, slug, type, level),
+      primary_category_data:categories!primary_category(id, name, slug, description, level),
+      secondary_category_data:categories!secondary_category(id, name, slug, description, level)
     `)
     .order('created_at', { ascending: false });
 
@@ -32,8 +33,9 @@ export async function getProductById(id: string) {
     .from('products')
     .select(`
       *,
-      main_category_data:categories!main_category(id, name, slug),
-      sub_category_data:categories!sub_category(id, name, slug)
+      main_category_data:categories!main_category(id, name, slug, type, level),
+      primary_category_data:categories!primary_category(id, name, slug, description, level),
+      secondary_category_data:categories!secondary_category(id, name, slug, description, level)
     `)
     .eq('id', id)
     .single();
@@ -95,7 +97,7 @@ export async function updateProduct(id: string, product: any) {
     }
 
     // Remove joined data fields that are not actual database columns
-    const { main_category_data, sub_category_data, created_at, updated_at, ...productData } = product;
+    const { main_category_data, primary_category_data, secondary_category_data, created_at, updated_at, ...productData } = product;
 
     // Handle numeric fields and clean the data
     const cleanedProduct = {
@@ -118,7 +120,8 @@ export async function updateProduct(id: string, product: any) {
       .select(`
         *,
         main_category_data:categories!main_category(id, name, slug),
-        sub_category_data:categories!sub_category(id, name, slug)
+        primary_category_data:categories!primary_category(id, name, slug),
+        secondary_category_data:categories!secondary_category(id, name, slug)
       `)
       .single();
 
@@ -161,8 +164,9 @@ export async function getProductsPaginated(
     .from('products')
     .select(`
       *,
-      main_category_data:categories!main_category(id, name, slug),
-      sub_category_data:categories!sub_category(id, name, slug)
+      main_category_data:categories!main_category(id, name, slug, type),
+      primary_category_data:categories!primary_category(id, name, slug, description),
+      secondary_category_data:categories!secondary_category(id, name, slug, description)
     `, { count: 'exact' });
 
   // Apply search filter
@@ -200,8 +204,21 @@ export async function getProductsPaginated(
 export async function getCategories() {
   const { data, error } = await supabase
     .from('categories')
-    .select('*')
-    .order('name');
+    .select(`
+      id,
+      name,
+      slug,
+      parent_id,
+      type,
+      level,
+      description,
+      image_url,
+      created_at,
+      updated_at,
+      count
+    `)
+    .order('level', { ascending: true }) // Order by level first
+    .order('name'); // Then by name
 
   if (error) {
     console.error('Error fetching categories:', error);
@@ -214,7 +231,19 @@ export async function getCategories() {
 export async function getCategoryById(id: string) {
   const { data, error } = await supabase
     .from('categories')
-    .select('*')
+    .select(`
+      id,
+      name,
+      slug,
+      parent_id,
+      type,
+      level,
+      description,
+      image_url,
+      created_at,
+      updated_at,
+      count
+    `)
     .eq('id', id)
     .single();
 
@@ -227,6 +256,26 @@ export async function getCategoryById(id: string) {
 }
 
 export async function createCategory(category: any) {
+  // Ensure type and level are set correctly
+  if (!category.type && category.parent_id) {
+    const parentCategory = await getCategoryById(category.parent_id);
+    category.type = parentCategory?.type;
+  }
+
+  // Set default level if not provided
+  if (!category.level) {
+    if (!category.parent_id) {
+      category.level = 'main';
+    } else {
+      const parentCategory = await getCategoryById(category.parent_id);
+      if (parentCategory?.level === 'main') {
+        category.level = 'primary';
+      } else if (parentCategory?.level === 'primary') {
+        category.level = 'secondary';
+      }
+    }
+  }
+
   const { data, error } = await supabase
     .from('categories')
     .insert(category)
@@ -242,6 +291,24 @@ export async function createCategory(category: any) {
 }
 
 export async function updateCategory(id: string, category: any) {
+  // Ensure type and level are set correctly
+  if (!category.type && category.parent_id) {
+    const parentCategory = await getCategoryById(category.parent_id);
+    category.type = parentCategory?.type;
+  }
+
+  // Update level if parent_id changes
+  if (category.parent_id) {
+    const parentCategory = await getCategoryById(category.parent_id);
+    if (parentCategory?.level === 'main') {
+      category.level = 'primary';
+    } else if (parentCategory?.level === 'primary') {
+      category.level = 'secondary';
+    }
+  } else if (category.parent_id === null) {
+    category.level = 'main';
+  }
+
   const { data, error } = await supabase
     .from('categories')
     .update(category)
@@ -326,7 +393,8 @@ export async function getQuoteProductDetails(quoteData: any) {
     .select(`
       *,
       main_category_data:categories!main_category(id, name, slug),
-      sub_category_data:categories!sub_category(id, name, slug)
+      primary_category_data:categories!primary_category(id, name, slug),
+      secondary_category_data:categories!secondary_category(id, name, slug)
     `)
     .in('id', productIds);
 

@@ -21,7 +21,8 @@ export interface Database {
           display_image: string | null
           hover_image: string | null
           main_category: string | null
-          sub_category: string | null
+          primary_category: string | null
+          secondary_category: string | null
           moq: number | null
           delivery: string | null
           rating: number | null
@@ -43,7 +44,8 @@ export interface Database {
           display_image?: string | null
           hover_image?: string | null
           main_category?: string | null
-          sub_category?: string | null
+          primary_category?: string | null
+          secondary_category?: string | null
           moq?: number | null
           delivery?: string | null
           rating?: number | null
@@ -65,7 +67,8 @@ export interface Database {
           display_image?: string | null
           hover_image?: string | null
           main_category?: string | null
-          sub_category?: string | null
+          primary_category?: string | null
+          secondary_category?: string | null
           moq?: number | null
           delivery?: string | null
           rating?: number | null
@@ -84,8 +87,14 @@ export interface Database {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "products_sub_category_fkey"
-            columns: ["sub_category"]
+            foreignKeyName: "products_primary_category_fkey"
+            columns: ["primary_category"]
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_secondary_category_fkey"
+            columns: ["secondary_category"]
             referencedRelation: "categories"
             referencedColumns: ["id"]
           }
@@ -99,6 +108,8 @@ export interface Database {
           description: string | null
           image_url: string | null
           parent_id: string | null
+          type: 'edible' | 'non_edible' | null
+          level: 'main' | 'primary' | 'secondary' | null
           created_at: string | null
           updated_at: string | null
           count: number | null
@@ -110,6 +121,8 @@ export interface Database {
           description?: string | null
           image_url?: string | null
           parent_id?: string | null
+          type?: 'edible' | 'non_edible' | null
+          level?: 'main' | 'primary' | 'secondary' | null
           created_at?: string | null
           updated_at?: string | null
           count?: number | null
@@ -121,13 +134,15 @@ export interface Database {
           description?: string | null
           image_url?: string | null
           parent_id?: string | null
+          type?: 'edible' | 'non_edible' | null
+          level?: 'main' | 'primary' | 'secondary' | null
           created_at?: string | null
           updated_at?: string | null
           count?: number | null
         }
         Relationships: [
           {
-            foreignKeyName: "new_categories_parent_id_fkey"
+            foreignKeyName: "categories_parent_id_fkey"
             columns: ["parent_id"]
             referencedRelation: "categories"
             referencedColumns: ["id"]
@@ -382,4 +397,16 @@ export interface Product {
   main_category?: string | null
   sub_category?: string | null
   reviews?: number
+  main_category_data?: {
+    id: string
+    name: string
+    slug: string
+    type: 'edible' | 'non_edible'
+  } | null
+  sub_category_data?: {
+    id: string
+    name: string
+    slug: string
+    description?: string | null
+  } | null
 } 

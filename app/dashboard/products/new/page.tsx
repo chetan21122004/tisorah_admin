@@ -21,6 +21,13 @@ interface Category {
   name: string
   slug: string
   parent_id: string | null
+  type?: 'edible' | 'non_edible'
+  level?: 'main' | 'primary' | 'secondary'
+  description?: string
+  image_url?: string | null
+  created_at?: string | null
+  updated_at?: string | null
+  count?: number | null
 }
 
 export default function NewProductPage() {
@@ -40,7 +47,8 @@ export default function NewProductPage() {
     description: "",
     price: "0",
     main_category: null as string | null,
-    sub_category: null as string | null,
+    primary_category: null as string | null,
+    secondary_category: null as string | null,
     moq: "",
     delivery: "",
     featured: false,
@@ -50,10 +58,20 @@ export default function NewProductPage() {
     price_max: "",
   })
   
-  // Get parent categories (no parent_id)
-  const mainCategories = categories.filter(cat => !cat.parent_id)
-  // Get subcategories for the selected main category
-  const subCategories = categories.filter(cat => cat.parent_id === formData.main_category)
+  // Get categories by level
+  const mainCategories = categories.filter(cat => cat.level === 'main')
+  const primaryCategories = categories.filter(cat => 
+    cat.level === 'primary' && 
+    cat.parent_id === formData.main_category
+  )
+  const secondaryCategories = categories.filter(cat => 
+    cat.level === 'secondary' && 
+    cat.parent_id === formData.primary_category
+  )
+
+  // Get category type for the selected main category
+  const selectedMainCategory = categories.find(cat => cat.id === formData.main_category)
+  const categoryType = selectedMainCategory?.type || null
 
   useEffect(() => {
     async function loadCategories() {
@@ -82,8 +100,20 @@ export default function NewProductPage() {
     const actualValue = value === "" ? null : value;
     
     if (name === 'main_category') {
-      // Reset sub_category when main_category changes
-      setFormData(prev => ({ ...prev, [name]: actualValue, sub_category: null }))
+      // Reset primary and secondary categories when main category changes
+      setFormData(prev => ({ 
+        ...prev, 
+        [name]: actualValue, 
+        primary_category: null,
+        secondary_category: null 
+      }))
+    } else if (name === 'primary_category') {
+      // Reset secondary category when primary category changes
+      setFormData(prev => ({ 
+        ...prev, 
+        [name]: actualValue,
+        secondary_category: null 
+      }))
     } else {
       setFormData(prev => ({ ...prev, [name]: actualValue }))
     }
@@ -234,7 +264,8 @@ export default function NewProductPage() {
         description: formData.description,
         price: parseFloat(formData.price_min) || 0, // Fallback price
         main_category: formData.main_category || null,
-        sub_category: formData.sub_category || null,
+        primary_category: formData.primary_category || null,
+        secondary_category: formData.secondary_category || null,
         moq: formData.moq ? parseFloat(formData.moq) : null,
         delivery: formData.delivery || null,
         featured: formData.featured,
@@ -407,7 +438,8 @@ export default function NewProductPage() {
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Categories Section */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div className="space-y-2.5">
                   <Label htmlFor="main_category" className="text-sm font-medium">Main Category <span className="text-red-500">*</span></Label>
                   <Select 
@@ -415,36 +447,81 @@ export default function NewProductPage() {
                     onValueChange={(value) => handleSelectChange("main_category", value)}
                   >
                     <SelectTrigger className="h-10 bg-white border-neutral-200 focus:ring-primary/20">
-                      <SelectValue placeholder="Select a category" />
+                      <SelectValue placeholder="Select main category" />
                     </SelectTrigger>
                     <SelectContent>
                       {mainCategories.map((category) => (
                         <SelectItem key={category.id} value={category.id}>
-                          {category.name}
+                          {category.name} ({category.type === 'edible' ? 'Edible' : 'Non-Edible'})
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {categoryType && (
+                    <p className="text-sm text-slate-500 mt-1">
+                      Selected category type: {categoryType === 'edible' ? 'Edible Gifts' : 'Non-Edible Gifts'}
+                    </p>
+                  )}
                 </div>
                 
                 <div className="space-y-2.5">
-                  <Label htmlFor="sub_category" className="text-sm font-medium">Sub Category</Label>
+                  <Label htmlFor="primary_category" className="text-sm font-medium">Primary Category</Label>
                   <Select 
-                    value={formData.sub_category || ""}
-                    onValueChange={(value) => handleSelectChange("sub_category", value)}
-                    disabled={!formData.main_category || subCategories.length === 0}
+                    value={formData.primary_category || ""}
+                    onValueChange={(value) => handleSelectChange("primary_category", value)}
+                    disabled={!formData.main_category || primaryCategories.length === 0}
                   >
                     <SelectTrigger className="h-10 bg-white border-neutral-200 focus:ring-primary/20">
-                      <SelectValue placeholder="Select a sub-category" />
+                      <SelectValue placeholder="Select primary category" />
                     </SelectTrigger>
                     <SelectContent>
-                      {subCategories.map((category) => (
+                      {primaryCategories.map((category) => (
                         <SelectItem key={category.id} value={category.id}>
                           {category.name}
+                          {category.description && (
+                            <span className="block text-xs text-slate-500 mt-0.5">
+                              {category.description}
+                            </span>
+                          )}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {formData.primary_category && (
+                    <p className="text-sm text-slate-500 mt-1">
+                      {categories.find(cat => cat.id === formData.primary_category)?.description}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2.5">
+                  <Label htmlFor="secondary_category" className="text-sm font-medium">Secondary Category</Label>
+                  <Select 
+                    value={formData.secondary_category || ""}
+                    onValueChange={(value) => handleSelectChange("secondary_category", value)}
+                    disabled={!formData.primary_category || secondaryCategories.length === 0}
+                  >
+                    <SelectTrigger className="h-10 bg-white border-neutral-200 focus:ring-primary/20">
+                      <SelectValue placeholder="Select secondary category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {secondaryCategories.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
+                          {category.description && (
+                            <span className="block text-xs text-slate-500 mt-0.5">
+                              {category.description}
+                            </span>
+                          )}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {formData.secondary_category && (
+                    <p className="text-sm text-slate-500 mt-1">
+                      {categories.find(cat => cat.id === formData.secondary_category)?.description}
+                    </p>
+                  )}
                 </div>
               </div>
             </CardContent>

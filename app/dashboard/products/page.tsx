@@ -10,6 +10,20 @@ import { getProductsPaginated, getCategories } from "@/lib/supabase"
 import { toast } from "sonner"
 import Link from "next/link"
 
+interface Category {
+  id: string
+  name: string
+  slug: string
+  parent_id: string | null
+  type: 'edible' | 'non_edible'
+  level: 'main' | 'primary' | 'secondary'
+  description?: string
+  image_url?: string | null
+  created_at?: string | null
+  updated_at?: string | null
+  count?: number | null
+}
+
 interface Product {
   id: string
   name: string
@@ -24,24 +38,31 @@ interface Product {
   customizable: boolean | null
   created_at: string | null
   main_category: string | null
-  sub_category: string | null
+  primary_category: string | null
+  secondary_category: string | null
   main_category_data: {
     id: string
     name: string
     slug: string
+    type: 'edible' | 'non_edible'
+    level: 'main'
   } | null
-  sub_category_data: {
+  primary_category_data: {
     id: string
     name: string
     slug: string
+    type: 'edible' | 'non_edible'
+    level: 'primary'
+    description?: string
   } | null
-}
-
-interface Category {
-  id: string
-  name: string
-  slug: string
-  parent_id: string | null
+  secondary_category_data: {
+    id: string
+    name: string
+    slug: string
+    type: 'edible' | 'non_edible'
+    level: 'secondary'
+    description?: string
+  } | null
 }
 
 export default function ProductsPage() {
@@ -142,7 +163,12 @@ export default function ProductsPage() {
     return () => observer.disconnect()
   }, [loadMoreProducts, hasMore, loadingMore])
 
-  const mainCategories = categories.filter(cat => !cat.parent_id)
+  // Get categories by level
+  const mainCategories = categories.filter(cat => cat.level === 'main')
+  const primaryCategories = categories.filter(cat => 
+    cat.level === 'primary' && 
+    cat.parent_id === selectedCategory
+  )
 
   const handleCategoryChange = (value: string) => {
     setSelectedCategory(value === "all" ? "" : value)
@@ -152,6 +178,11 @@ export default function ProductsPage() {
     const [field, order] = value.split("-")
     setSortBy(field)
     setSortOrder(order)
+  }
+
+  const formatPrice = (price: number | null): string => {
+    if (!price) return '0'
+    return price.toLocaleString('en-IN')
   }
 
   return (
@@ -217,15 +248,31 @@ export default function ProductsPage() {
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium">Category:</label>
               <Select value={selectedCategory || "all"} onValueChange={handleCategoryChange}>
-                <SelectTrigger className="w-48">
+                <SelectTrigger className="w-[300px]">
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {mainCategories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
+                  {/* Group categories by type */}
+                  <SelectItem value="edible" disabled className="font-semibold text-primary">
+                    Edible Gifts
+                  </SelectItem>
+                  {mainCategories
+                    .filter(cat => cat.type === 'edible')
+                    .map((category) => (
+                      <SelectItem key={category.id} value={category.id} className="pl-4">
+                        {category.name}
+                      </SelectItem>
+                  ))}
+                  <SelectItem value="non_edible" disabled className="font-semibold text-primary mt-2">
+                    Non-Edible Gifts
+                  </SelectItem>
+                  {mainCategories
+                    .filter(cat => cat.type === 'non_edible')
+                    .map((category) => (
+                      <SelectItem key={category.id} value={category.id} className="pl-4">
+                        {category.name}
+                      </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -265,103 +312,91 @@ export default function ProductsPage() {
           ))}
         </div>
       ) : (
-        <>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {products.length === 0 ? (
-              <div className="col-span-full text-center py-12">
-                <p className="text-muted-foreground">No products found. Try adjusting your search or filters.</p>
-              </div>
-            ) : (
-              products.map((product) => (
-                <Card key={product.id} className="overflow-hidden border-neutral-200 bg-white hover:border-secondary/50 transition-colors group">
-                  <div className="aspect-square w-full bg-neutral-100 relative overflow-hidden">
-                    {product.images && product.images.length > 0 ? (
-                      <>
-                        <img 
-                          src={product.display_image || product.images[0]} 
-                          alt={product.name}
-                          className="object-cover w-full h-full transition-opacity duration-300 group-hover:opacity-0"
-                        />
-                        {(product.hover_image || (product.images.length > 1 && product.images[1])) && (
-                          <img 
-                            src={product.hover_image || product.images[1]}
-                            alt={`${product.name} alternate view`}
-                            className="object-cover w-full h-full absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                          />
-                        )}
-                      </>
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
-                        No Image
-                      </div>
-                    )}
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {products.map((product) => (
+            <Link key={product.id} href={`/dashboard/products/${product.id}`}>
+              <Card className="overflow-hidden hover:shadow-lg transition-shadow bg-white/80 backdrop-blur-sm border-0">
+                <div className="aspect-square relative">
+                  {product.display_image || (product.images?.[0]) ? (
+                    <img
+                      src={product.display_image || product.images?.[0]}
+                      alt={product.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-slate-100 flex items-center justify-center">
+                      <span className="text-slate-400">No image</span>
+                    </div>
+                  )}
+                  {product.main_category_data?.type && (
+                    <div className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-medium ${
+                      product.main_category_data.type === 'edible' 
+                        ? 'bg-green-100 text-green-700' 
+                        : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {product.main_category_data.type === 'edible' ? 'Edible' : 'Non-Edible'}
+                    </div>
+                  )}
+                </div>
+                <CardContent className="p-4">
+                  <div className="mb-2">
+                    <h3 className="font-medium text-slate-900 line-clamp-1">{product.name}</h3>
+                    <div className="flex items-center gap-1 text-sm text-slate-500">
+                      {product.main_category_data?.name && (
+                        <>
+                          <span>{product.main_category_data.name}</span>
+                          {product.primary_category_data?.name && (
+                            <>
+                              <span className="mx-1">→</span>
+                              <span>{product.primary_category_data.name}</span>
+                            </>
+                          )}
+                          {product.secondary_category_data?.name && (
+                            <>
+                              <span className="mx-1">→</span>
+                              <span>{product.secondary_category_data.name}</span>
+                            </>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="text-primary font-medium">
+                      {product.has_price_range
+                        ? `₹${formatPrice(product.price_min)} - ₹${formatPrice(product.price_max)}`
+                        : `₹${formatPrice(product.price)}`}
+                    </div>
                     {product.featured && (
-                      <div className="absolute top-2 right-2 bg-secondary text-white text-xs px-2 py-1 rounded-full z-10">
+                      <div className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
                         Featured
                       </div>
                     )}
                   </div>
-                  <CardContent className="p-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Link href={`/dashboard/products/${product.id}`}>
-                          <h3 className="font-medium truncate hover:text-primary cursor-pointer">{product.name}</h3>
-                        </Link>
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {product.main_category_data?.name || 'Uncategorized'}
-                        {product.sub_category_data?.name && ` / ${product.sub_category_data.name}`}
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="font-medium text-sm">
-                          {product.has_price_range && product.price_min && product.price_max
-                            ? `₹${product.price_min.toLocaleString('en-IN')} - ₹${product.price_max.toLocaleString('en-IN')}`
-                            : `₹${product.price.toLocaleString('en-IN')}`}
-                        </div>
-                        <Link href={`/dashboard/products/${product.id}?edit=true`}>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <span className="sr-only">Edit product</span>
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="h-4 w-4"
-                            >
-                              <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                              <path d="m15 5 4 4" />
-                            </svg>
-                          </Button>
-                        </Link>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+          
+          {/* Observer element for infinite scroll */}
+          <div ref={observerRef} className="col-span-full h-4" />
+        </div>
+      )}
+
+      {loadingMore && (
+        <div className="flex justify-center py-4">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        </div>
+      )}
+
+      {!loading && products.length === 0 && (
+        <div className="text-center py-12">
+          <div className="w-16 h-16 bg-slate-100 rounded-full mx-auto mb-4 flex items-center justify-center">
+            <Search className="w-8 h-8 text-slate-400" />
           </div>
-          
-          {/* Infinite scroll trigger */}
-          {hasMore && (
-            <div ref={observerRef} className="flex justify-center py-8">
-              {loadingMore && (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading more products...
-                </div>
-              )}
-            </div>
-          )}
-          
-          {!hasMore && products.length > 0 && (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">You've reached the end of the products list.</p>
-            </div>
-          )}
-        </>
+          <h2 className="text-xl font-semibold text-slate-700 mb-2">No products found</h2>
+          <p className="text-slate-500">Try adjusting your search or filters</p>
+        </div>
       )}
     </div>
   )
