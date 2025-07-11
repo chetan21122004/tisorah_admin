@@ -101,7 +101,7 @@ export default function ProductsPage() {
     
     loadInitialData()
   }, [])
-
+  
   // Load more products when filters change
   useEffect(() => {
     if (loading) return
@@ -227,7 +227,7 @@ export default function ProductsPage() {
           </Button>
           <Select value={`${sortBy}-${sortOrder}`} onValueChange={handleSortChange}>
             <SelectTrigger className="w-40 bg-white border-neutral-200">
-              <SlidersHorizontal className="mr-2 h-4 w-4" />
+            <SlidersHorizontal className="mr-2 h-4 w-4" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -318,9 +318,9 @@ export default function ProductsPage() {
               <Card className="overflow-hidden hover:shadow-lg transition-shadow bg-white/80 backdrop-blur-sm border-0">
                 <div className="aspect-square relative">
                   {product.display_image || (product.images?.[0]) ? (
-                    <img
+                        <img 
                       src={product.display_image || product.images?.[0]}
-                      alt={product.name}
+                          alt={product.name}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -356,8 +356,8 @@ export default function ProductsPage() {
                               <span className="mx-1">→</span>
                               <span>{product.secondary_category_data.name}</span>
                             </>
-                          )}
-                        </>
+                        )}
+                      </>
                       )}
                     </div>
                   </div>
@@ -366,16 +366,16 @@ export default function ProductsPage() {
                       {product.has_price_range
                         ? `₹${formatPrice(product.price_min)} - ₹${formatPrice(product.price_max)}`
                         : `₹${formatPrice(product.price)}`}
-                    </div>
+                      </div>
                     {product.featured && (
                       <div className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
                         Featured
                       </div>
                     )}
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
           ))}
           
           {/* Observer element for infinite scroll */}

@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
 import Link from "next/link"
-import { ArrowLeft, Edit3, Trash2, Upload, X, Star, Package, Truck, Tag, Image as ImageIcon } from "lucide-react"
+import { ArrowLeft, Edit3, Trash2, Upload, X, Star, Package, Truck, Tag, Image as ImageIcon, Loader2 } from "lucide-react"
 
 interface Category {
   id: string
@@ -43,6 +43,15 @@ interface CategoryFromAPI {
   created_at: string | null
   updated_at: string | null
   count: number | null
+}
+
+interface CategoryData {
+  id: string
+  name: string
+  slug: string
+  type: 'edible' | 'non_edible'
+  level: 'main' | 'primary' | 'secondary'
+  description?: string
 }
 
 interface ProductFormData {
@@ -152,7 +161,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     async function loadData() {
       setLoading(true)
       try {
-        const prod = await getProductById(id)
+      const prod = await getProductById(id)
         const categoriesData = await getCategories()
         
         // Filter out any categories with invalid type or level and convert to proper Category type
@@ -175,31 +184,55 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             updated_at: cat.updated_at,
             count: cat.count
           }))
+      
+      if (prod) {
+        // Set initial display and hover image indices if they exist
+        if (prod.display_image && prod.images) {
+          const displayIndex = prod.images.findIndex(img => img === prod.display_image)
+          if (displayIndex >= 0) {
+            setSelectedDisplayImageIndex(displayIndex)
+          }
+        }
         
-        if (prod) {
-          // Set initial display and hover image indices if they exist
-          if (prod.display_image && prod.images) {
-            const displayIndex = prod.images.findIndex(img => img === prod.display_image)
-            if (displayIndex >= 0) {
-              setSelectedDisplayImageIndex(displayIndex)
-            }
+        if (prod.hover_image && prod.images) {
+          const hoverIndex = prod.images.findIndex(img => img === prod.hover_image)
+          if (hoverIndex >= 0) {
+            setSelectedHoverImageIndex(hoverIndex)
           }
-          
-          if (prod.hover_image && prod.images) {
-            const hoverIndex = prod.images.findIndex(img => img === prod.hover_image)
-            if (hoverIndex >= 0) {
-              setSelectedHoverImageIndex(hoverIndex)
-            }
+        }
+        
+          // Process category data with proper type assertions
+          const processedMainCategory = prod.main_category_data && {
+            id: prod.main_category_data.id,
+            name: prod.main_category_data.name,
+            slug: prod.main_category_data.slug,
+            type: (prod.main_category_data.type || 'non_edible') as 'edible' | 'non_edible',
+            level: 'main' as const
           }
-          
-          // Ensure has_price_range is set to true and convert to ProductFormData
+
+          const processedPrimaryCategory = prod.primary_category_data && {
+            id: prod.primary_category_data.id,
+            name: prod.primary_category_data.name,
+            slug: prod.primary_category_data.slug,
+            type: (prod.primary_category_data.type || 'non_edible') as 'edible' | 'non_edible',
+            level: 'primary' as const,
+            description: prod.primary_category_data.description || undefined
+          }
+
+          const processedSecondaryCategory = prod.secondary_category_data && {
+            id: prod.secondary_category_data.id,
+            name: prod.secondary_category_data.name,
+            slug: prod.secondary_category_data.slug,
+            type: (prod.secondary_category_data.type || 'non_edible') as 'edible' | 'non_edible',
+            level: 'secondary' as const,
+            description: prod.secondary_category_data.description || undefined
+          }
+
           const updatedProd: ProductFormData = {
-            ...prod,
-            has_price_range: true,
-            // If price range is not set, initialize it with the single price
-            price_min: prod.price_min !== undefined ? prod.price_min : prod.price,
-            price_max: prod.price_max !== undefined ? prod.price_max : prod.price,
-            // Ensure all required fields are present
+          ...prod,
+          has_price_range: true,
+            price_min: prod.price_min ?? prod.price,
+            price_max: prod.price_max ?? prod.price,
             name: prod.name || '',
             price: prod.price || 0,
             images: prod.images || null,
@@ -213,13 +246,16 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             secondary_category: prod.secondary_category || null,
             moq: prod.moq || null,
             delivery: prod.delivery || null,
-            description: prod.description || ''
-          }
-          
-          setProduct(updatedProd)
-          setFormData(updatedProd)
-        } else {
-          setProduct(null)
+            description: prod.description || '',
+            main_category_data: processedMainCategory,
+            primary_category_data: processedPrimaryCategory,
+            secondary_category_data: processedSecondaryCategory
+        }
+        
+        setProduct(updatedProd)
+        setFormData(updatedProd)
+      } else {
+        setProduct(null)
           setFormData({
             name: '',
             description: '',
@@ -239,15 +275,16 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             moq: null,
             delivery: null
           })
-        }
+      }
         setCategories(validCategories)
       } catch (error) {
         console.error('Error loading data:', error)
         toast.error('Failed to load product data')
       } finally {
         setLoading(false)
-      }
     }
+    }
+    
     loadData()
   }, [id])
 
@@ -439,6 +476,93 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     return price.toLocaleString('en-IN')
   }
 
+  // Update the ImageCard component for better sizing and styling
+  const ImageCard = ({ 
+    image, 
+    index, 
+    isDisplay,
+    isHover,
+    onSetDisplay,
+    onSetHover,
+    showControls = true,
+    size = "medium"
+  }: { 
+    image: string;
+    index: number;
+    isDisplay?: boolean;
+    isHover?: boolean;
+    onSetDisplay?: () => void;
+    onSetHover?: () => void;
+    showControls?: boolean;
+    size?: "small" | "medium" | "large";
+  }) => {
+    const sizeClasses = {
+      small: "h-44",
+      medium: "h-56",
+      large: "h-72"
+  }
+
+  return (
+      <div className="relative group">
+        <div className={`relative rounded-lg overflow-hidden border ${isDisplay || isHover ? 'border-primary/50' : 'border-neutral-200'} bg-white transition-all duration-200 ease-in-out hover:shadow-lg ${sizeClasses[size]}`}>
+          <img 
+            src={image} 
+            alt={`Product image ${(index + 1).toString()}`} 
+            className="w-full h-full object-contain p-2"
+          />
+          {showControls && editMode && (
+            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all duration-200 flex flex-col items-center justify-center gap-3 p-4">
+              <div className="flex flex-col gap-2 w-full max-w-[180px]">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={isDisplay ? "default" : "secondary"}
+                  className={`w-full ${isDisplay ? 'bg-primary hover:bg-primary/90' : 'bg-white hover:bg-white/90 text-black'}`}
+                  onClick={onSetDisplay}
+                >
+                  <ImageIcon className="h-4 w-4 mr-2" />
+                  {isDisplay ? 'Current Display' : 'Set as Display'}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={isHover ? "default" : "secondary"}
+                  className={`w-full ${isHover ? 'bg-primary hover:bg-primary/90' : 'bg-white hover:bg-white/90 text-black'}`}
+                  onClick={onSetHover}
+                >
+                  <ImageIcon className="h-4 w-4 mr-2" />
+                  {isHover ? 'Current Hover' : 'Set as Hover'}
+          </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => handleImageDelete(image)}
+                  className="w-full"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Remove
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+                      <div className="absolute top-2 right-2 flex gap-1">
+          {isDisplay && (
+            <Badge className="bg-green-500/90 text-white">
+              Display
+            </Badge>
+          )}
+          {isHover && (
+            <Badge className="bg-blue-500/90 text-white">
+              Hover
+            </Badge>
+                      )}
+                    </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
@@ -489,491 +613,499 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard/products">
-              <Button variant="ghost" size="sm" className="hover:bg-white/50">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Products
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-3xl font-bold text-slate-800">Product Details</h1>
-              <p className="text-slate-600 mt-1">Manage your product information and settings</p>
-            </div>
+    <div className="space-y-6 relative pb-10">
+      <div className="pattern-dots pattern-opacity-10 pattern-secondary absolute inset-0 pointer-events-none" />
+      
+      <div className="flex items-center justify-between bg-white shadow-sm rounded-lg p-4 mb-6">
+        <div className="flex items-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => router.back()}
+            className="mr-3 rounded-full bg-white border border-neutral-100 shadow-sm hover:bg-gray-100"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="sr-only">Back</span>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-serif font-bold tracking-tight text-primary">
+              {editMode ? 'Edit Product' : 'Product Details'}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {editMode ? 'Make changes to your product' : 'View and manage your product details'}
+            </p>
           </div>
-          
-          {!editMode && (
-            <div className="flex items-center gap-2">
+        </div>
+        <div className="flex gap-2">
+          {editMode ? (
+            <>
               <Button
-                onClick={() => setEditMode(true)}
+                variant="outline"
+                onClick={() => setEditMode(false)}
+                disabled={updating}
+                className="bg-white border-neutral-200"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                form="product-form"
+                disabled={updating}
                 className="bg-primary hover:bg-primary/90"
               >
-                <Edit3 className="w-4 h-4 mr-2" />
+                {updating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Edit3 className="mr-2 h-4 w-4" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/dashboard/products/${id}?edit=true`)}
+                className="bg-white border-neutral-200"
+              >
+                <Edit3 className="mr-2 h-4 w-4" />
                 Edit Product
               </Button>
               <Button
-                onClick={handleDelete}
                 variant="destructive"
+                onClick={handleDelete}
                 disabled={deleting}
               >
-                <Trash2 className="w-4 h-4 mr-2" />
-                {deleting ? "Deleting..." : "Delete"}
+                {deleting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </>
+                )}
               </Button>
-            </div>
+            </>
           )}
         </div>
+      </div>
 
-        {/* Error/Success Messages */}
-        {errorMsg && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-700 text-sm">{errorMsg}</p>
-          </div>
-        )}
-        {successMsg && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <p className="text-green-700 text-sm">{successMsg}</p>
-          </div>
-        )}
-
-        {editMode ? (
-          <form onSubmit={handleUpdate} className="space-y-8">
-            {/* Product Images */}
-            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
-              <CardHeader className="pb-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <ImageIcon className="w-5 h-5 text-primary" />
-                    <CardTitle className="text-xl">Product Images</CardTitle>
-                  </div>
-                  <div>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/png, image/jpeg, image/webp"
-                      multiple
-                      className="hidden"
-                      id="product-images-upload"
-                      onChange={handleImageUpload}
-                      disabled={imageUploading}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={imageUploading}
-                      className="bg-white hover:bg-slate-50"
-                    >
-                      <Upload className="w-4 h-4 mr-2" />
-                      {imageUploading ? "Uploading..." : "Upload Images"}
-                    </Button>
-                  </div>
+      <form id="product-form" onSubmit={handleUpdate} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Content - Left 2/3 */}
+        <div className="space-y-6 lg:col-span-2">
+          {/* Basic Information */}
+          <Card className="border-neutral-200 bg-white shadow-sm hover:shadow-md transition-shadow">
+            <CardHeader className="pb-3 border-b bg-neutral-50/50">
+              <CardTitle className="text-lg font-medium">Basic Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6 p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2.5">
+                  <Label htmlFor="name" className="text-sm font-medium">Product Name <span className="text-red-500">*</span></Label>
+                  <Input 
+                    id="name" 
+                    name="name" 
+                    placeholder="Enter product name" 
+                    value={formData.name}
+                    onChange={handleChange}
+                    required
+                    disabled={!editMode}
+                    className="h-10 bg-white border-neutral-200 focus:border-primary/50"
+                  />
                 </div>
-              </CardHeader>
-              <CardContent>
-                {formData.images && formData.images.length > 0 ? (
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                      {formData.images.map((img: string, idx: number) => (
-                        <div key={img} className="relative group">
-                          <div className="aspect-square rounded-lg overflow-hidden border-2 border-slate-200 hover:border-primary transition-colors">
-                            <img src={img} alt={`Product image ${idx + 1}`} className="w-full h-full object-cover" />
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleImageDelete(img)}
-                            className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-                            disabled={imageUploading}
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-
-                        </div>
-                      ))}
-                    </div>
-                    
-
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <ImageIcon className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                    <p className="text-slate-500 mb-4">No images uploaded yet</p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={imageUploading}
-                    >
-                      <Upload className="w-4 h-4 mr-2" />
-                      Upload Your First Image
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Product Information */}
-            <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="text-xl">Product Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="name" className="text-sm font-medium text-slate-700">Product Name *</Label>
-                    <Input 
-                      id="name" 
-                      name="name" 
-                      value={formData.name} 
-                      onChange={handleChange} 
-                      required 
-                      className="bg-white border-slate-300 focus:border-primary focus:ring-primary"
-                      placeholder="Enter product name"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="moq" className="text-sm font-medium text-slate-700">Minimum Order Quantity</Label>
-                    <Input 
-                      id="moq" 
-                      name="moq" 
-                      type="number"
-                      value={formData.moq || ""} 
-                      onChange={handleChange} 
-                      className="bg-white border-slate-300 focus:border-primary focus:ring-primary"
-                      placeholder="e.g., 10"
-                    />
-                  </div>
+                
+                <div className="space-y-2.5">
+                  <Label htmlFor="moq" className="text-sm font-medium">Minimum Order Quantity</Label>
+                  <Input 
+                    id="moq" 
+                    name="moq" 
+                    placeholder="e.g., 50" 
+                    value={formData.moq || ''}
+                    onChange={handleChange}
+                    disabled={!editMode}
+                    className="h-10 bg-white border-neutral-200 focus:border-primary/50"
+                  />
                 </div>
+              </div>
+              
+              <div className="space-y-2.5">
+                <Label htmlFor="description" className="text-sm font-medium">Description</Label>
+                <Textarea 
+                  id="description" 
+                  name="description" 
+                  placeholder="Enter product description" 
+                  rows={4}
+                  value={formData.description || ''}
+                  onChange={handleChange}
+                  disabled={!editMode}
+                  className="bg-white border-neutral-200 resize-y focus:border-primary/50"
+                />
+              </div>
+              
+              <div className="space-y-2.5">
+                <Label htmlFor="delivery" className="text-sm font-medium">Delivery Information</Label>
+                <Input 
+                  id="delivery" 
+                  name="delivery" 
+                  placeholder="e.g., 3-5 business days" 
+                  value={formData.delivery || ''}
+                  onChange={handleChange}
+                  disabled={!editMode}
+                  className="h-10 bg-white border-neutral-200 focus:border-primary/50"
+                />
+              </div>
+            </CardContent>
+          </Card>
 
-                <div className="space-y-4">
-                  <Label className="text-sm font-medium text-slate-700">Price Range (₹) *</Label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="price_min" className="text-sm text-slate-600">Minimum Price</Label>
+          {/* Price & Categories */}
+          <Card className="border-neutral-200 bg-white shadow-sm hover:shadow-md transition-shadow">
+            <CardHeader className="pb-3 border-b bg-neutral-50/50">
+              <CardTitle className="text-lg font-medium">Pricing & Categories</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6 p-6">
+              <div className="space-y-4">
+                <Label className="text-sm font-medium">Price Range (₹) <span className="text-red-500">*</span></Label>
+                <div className="grid grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="price_min" className="text-xs text-muted-foreground">Minimum Price</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-500">₹</span>
                       <Input 
                         id="price_min" 
                         name="price_min" 
                         type="number" 
-                        value={formData.price_min || ""} 
-                        onChange={handleChange} 
-                        className="bg-white border-slate-300 focus:border-primary focus:ring-primary"
-                        placeholder="₹0"
+                        placeholder="0.00" 
+                        value={formData.price_min || formData.price}
+                        onChange={handleChange}
                         required
+                        disabled={!editMode}
+                        className="h-10 bg-white border-neutral-200 pl-7 focus:border-primary/50"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="price_max" className="text-sm text-slate-600">Maximum Price</Label>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="price_max" className="text-xs text-muted-foreground">Maximum Price</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-500">₹</span>
                       <Input 
                         id="price_max" 
                         name="price_max" 
                         type="number" 
-                        value={formData.price_max || ""} 
-                        onChange={handleChange} 
-                        className="bg-white border-slate-300 focus:border-primary focus:ring-primary"
-                        placeholder="₹0"
+                        placeholder="0.00" 
+                        value={formData.price_max || formData.price}
+                        onChange={handleChange}
                         required
+                        disabled={!editMode}
+                        className="h-10 bg-white border-neutral-200 pl-7 focus:border-primary/50"
                       />
                     </div>
                   </div>
                 </div>
-
-                {/* Categories Section */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  <div className="space-y-2.5">
-                    <Label htmlFor="main_category" className="text-sm font-medium">Main Category <span className="text-red-500">*</span></Label>
-                    <Select 
-                      value={formData.main_category || "none"} 
-                      onValueChange={(value) => handleSelectChange("main_category", value)}
-                      disabled={!editMode}
-                    >
-                      <SelectTrigger className="h-10 bg-white border-neutral-200 focus:ring-primary/20">
-                        <SelectValue placeholder="Select main category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {mainCategories.map((category) => (
-                          <SelectItem key={category.id} value={category.id}>
-                            {category.name} ({category.type === 'edible' ? 'Edible' : 'Non-Edible'})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {categoryType && (
-                      <p className="text-sm text-slate-500 mt-1">
-                        Selected category type: {categoryType === 'edible' ? 'Edible Gifts' : 'Non-Edible Gifts'}
-                      </p>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-2.5">
-                    <Label htmlFor="primary_category" className="text-sm font-medium">Primary Category</Label>
-                    <Select 
-                      value={formData.primary_category || "none"}
-                      onValueChange={(value) => handleSelectChange("primary_category", value)}
-                      disabled={!editMode || !formData.main_category || primaryCategories.length === 0}
-                    >
-                      <SelectTrigger className="h-10 bg-white border-neutral-200 focus:ring-primary/20">
-                        <SelectValue placeholder="Select primary category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {primaryCategories.map((category) => (
-                          <SelectItem key={category.id} value={category.id}>
-                            {category.name}
-                            {category.description && (
-                              <span className="block text-xs text-slate-500 mt-0.5">
-                                {category.description}
-                              </span>
-                            )}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {formData.primary_category && (
-                      <p className="text-sm text-slate-500 mt-1">
-                        {categories.find(cat => cat.id === formData.primary_category)?.description}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2.5">
-                    <Label htmlFor="secondary_category" className="text-sm font-medium">Secondary Category</Label>
-                    <Select 
-                      value={formData.secondary_category || "none"}
-                      onValueChange={(value) => handleSelectChange("secondary_category", value)}
-                      disabled={!editMode || !formData.primary_category || secondaryCategories.length === 0}
-                    >
-                      <SelectTrigger className="h-10 bg-white border-neutral-200 focus:ring-primary/20">
-                        <SelectValue placeholder="Select secondary category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {secondaryCategories.map((category) => (
-                          <SelectItem key={category.id} value={category.id}>
-                            {category.name}
-                            {category.description && (
-                              <span className="block text-xs text-slate-500 mt-0.5">
-                                {category.description}
-                              </span>
-                            )}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {formData.secondary_category && (
-                      <p className="text-sm text-slate-500 mt-1">
-                        {categories.find(cat => cat.id === formData.secondary_category)?.description}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="delivery" className="text-sm font-medium text-slate-700">Delivery Information</Label>
-                  <Input 
-                    id="delivery" 
-                    name="delivery" 
-                    value={formData.delivery || ""} 
-                    onChange={handleChange} 
-                    className="bg-white border-slate-300 focus:border-primary focus:ring-primary"
-                    placeholder="e.g., 3-5 business days"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="description" className="text-sm font-medium text-slate-700">Description</Label>
-                  <Textarea 
-                    id="description" 
-                    name="description" 
-                    value={formData.description || ""} 
-                    onChange={handleChange} 
-                    className="min-h-32 bg-white border-slate-300 focus:border-primary focus:ring-primary"
-                    placeholder="Describe your product..."
-                  />
-                </div>
-
-                <div className="flex flex-wrap gap-6">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="featured" 
-                      checked={!!formData.featured} 
-                      onCheckedChange={(checked: boolean | "indeterminate") => handleCheckboxChange("featured", !!checked)} 
-                    />
-                    <Label htmlFor="featured" className="text-sm font-medium text-slate-700">Featured Product</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="customizable" 
-                      checked={!!formData.customizable} 
-                      onCheckedChange={(checked: boolean | "indeterminate") => handleCheckboxChange("customizable", !!checked)} 
-                    />
-                    <Label htmlFor="customizable" className="text-sm font-medium text-slate-700">Customizable</Label>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Form Actions */}
-            <div className="flex justify-end gap-4">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => {
-                  setEditMode(false)
-                  setFormData(product as ProductFormData)
-                  // Remove edit parameter from URL
-                  const url = new URL(window.location.href)
-                  url.searchParams.delete('edit')
-                  window.history.replaceState({}, '', url.toString())
-                }}
-                className="bg-white hover:bg-slate-50"
-              >
-                Cancel
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={updating}
-                className="bg-primary hover:bg-primary/90 min-w-32"
-              >
-                {updating ? "Saving..." : "Save Changes"}
-              </Button>
-            </div>
-          </form>
-        ) : (
-          /* View Mode */
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Product Images */}
-            <div className="space-y-4">
-              <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm overflow-hidden">
-                <div className="aspect-square bg-slate-100">
-                  {product.images && product.images.length > 0 ? (
-                    <img 
-                      src={product.display_image || product.images[0]} 
-                      alt={product.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <div className="text-center">
-                        <ImageIcon className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-                        <p className="text-slate-500">No image available</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </Card>
+              </div>
               
-              {product.images && product.images.length > 1 && (
-                <div className="grid grid-cols-4 gap-2">
-                  {product.images.slice(0, 4).map((img: string, idx: number) => (
-                    <div key={idx} className="aspect-square rounded-lg overflow-hidden border-2 border-slate-200 hover:border-primary transition-colors cursor-pointer">
-                      <img src={img} alt={`Product ${idx + 1}`} className="w-full h-full object-cover" />
-                    </div>
-                  ))}
+              {/* Categories Section */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div className="space-y-2.5">
+                  <Label htmlFor="main_category" className="text-sm font-medium">Main Category <span className="text-red-500">*</span></Label>
+                  <Select 
+                    value={formData.main_category || ""} 
+                    onValueChange={(value) => handleSelectChange("main_category", value)}
+                    disabled={!editMode}
+                  >
+                    <SelectTrigger className="h-10 bg-white border-neutral-200 focus:ring-primary/20">
+                      <SelectValue placeholder="Select main category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {mainCategories.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name} ({category.type === 'edible' ? 'Edible' : 'Non-Edible'})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {categoryType && (
+                    <p className="text-sm text-slate-500 mt-1">
+                      Selected category type: {categoryType === 'edible' ? 'Edible Gifts' : 'Non-Edible Gifts'}
+                    </p>
+                  )}
                 </div>
-              )}
-            </div>
+                
+                <div className="space-y-2.5">
+                  <Label htmlFor="primary_category" className="text-sm font-medium">Primary Category</Label>
+                  <Select 
+                    value={formData.primary_category || ""}
+                    onValueChange={(value) => handleSelectChange("primary_category", value)}
+                    disabled={!editMode || !formData.main_category || primaryCategories.length === 0}
+                  >
+                    <SelectTrigger className="h-10 bg-white border-neutral-200 focus:ring-primary/20">
+                      <SelectValue placeholder="Select primary category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {primaryCategories.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
+                          {category.description && (
+                            <span className="block text-xs text-slate-500 mt-0.5">
+                              {category.description}
+                            </span>
+                          )}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {formData.primary_category && (
+                    <p className="text-sm text-slate-500 mt-1">
+                      {categories.find(cat => cat.id === formData.primary_category)?.description}
+                    </p>
+                  )}
+                </div>
 
-            {/* Product Information */}
-            <div className="space-y-6">
-              <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
-                <CardHeader className="pb-4">
-                  <div className="flex items-start justify-between">
+                <div className="space-y-2.5">
+                  <Label htmlFor="secondary_category" className="text-sm font-medium">Secondary Category</Label>
+                  <Select 
+                    value={formData.secondary_category || ""}
+                    onValueChange={(value) => handleSelectChange("secondary_category", value)}
+                    disabled={!editMode || !formData.primary_category || secondaryCategories.length === 0}
+                  >
+                    <SelectTrigger className="h-10 bg-white border-neutral-200 focus:ring-primary/20">
+                      <SelectValue placeholder="Select secondary category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {secondaryCategories.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
+                          {category.description && (
+                            <span className="block text-xs text-slate-500 mt-0.5">
+                              {category.description}
+                            </span>
+                          )}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {formData.secondary_category && (
+                    <p className="text-sm text-slate-500 mt-1">
+                      {categories.find(cat => cat.id === formData.secondary_category)?.description}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Regular Product Images */}
+          <Card className="border-neutral-200 bg-white shadow-sm hover:shadow-md transition-shadow">
+            <CardHeader className="pb-3 border-b bg-neutral-50/50">
+              <CardTitle className="text-lg font-medium">Additional Product Images</CardTitle>
+              <p className="text-xs text-muted-foreground">Upload multiple product images to showcase different angles</p>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                {formData.images?.map((img, idx) => (
+                  <ImageCard
+                    key={img}
+                    image={img}
+                    index={idx}
+                    isDisplay={img === formData.display_image}
+                    isHover={img === formData.hover_image}
+                    onSetDisplay={() => {
+                      setFormData(prev => ({
+                        ...prev,
+                        display_image: img
+                      }));
+                    }}
+                    onSetHover={() => {
+                      setFormData(prev => ({
+                        ...prev,
+                        hover_image: img
+                      }));
+                    }}
+                    showControls={editMode}
+                    size="medium"
+                  />
+                ))}
+                {editMode && (
+                  <label className="aspect-square bg-neutral-100 rounded-md border border-dashed border-neutral-300 flex flex-col items-center justify-center cursor-pointer hover:bg-neutral-50 transition-colors text-neutral-500 hover:border-primary/30">
+                    <Upload className="w-6 h-6 mb-2 text-neutral-400" />
+                    <span className="text-xs font-medium">Add Image</span>
+                    <span className="text-xs text-neutral-400 mt-1">Click to upload</span>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/png, image/jpeg, image/webp"
+                      className="hidden"
+                      onChange={handleImageUpload}
+                      ref={fileInputRef}
+                    />
+                  </label>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
+        {/* Sidebar - Right 1/3 */}
+        <div className="space-y-6 lg:self-start sticky top-6">
+          {/* Publish Card */}
+          <Card className="border-neutral-200 bg-white shadow-sm hover:shadow-md transition-shadow">
+            <CardHeader className="pb-3 border-b bg-neutral-50/50">
+              <CardTitle className="text-lg font-medium">Publish</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5 p-6">
+              {editMode ? (
+                <Button 
+                  type="submit"
+                  disabled={updating}
+                  className="w-full bg-primary hover:bg-primary/90 text-white h-11 font-medium"
+                >
+                  {updating ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
+                </Button>
+              ) : (
+                <Button 
+                  type="button"
+                  onClick={() => router.push(`/dashboard/products/${id}?edit=true`)}
+                  className="w-full bg-primary hover:bg-primary/90 text-white h-11 font-medium"
+                >
+                  <Edit3 className="mr-2 h-4 w-4" />
+                  Edit Product
+                </Button>
+              )}
+              
+              <div className="bg-neutral-50 p-3 rounded-md border border-neutral-200">
+                <h3 className="text-sm font-medium mb-2">Product Options</h3>
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="featured"
+                      checked={formData.featured || false}
+                      onCheckedChange={(checked) => handleCheckboxChange("featured", checked === true)}
+                      disabled={!editMode}
+                    />
                     <div>
-                      <CardTitle className="text-2xl font-bold text-slate-800 mb-2">{product.name}</CardTitle>
-                      <div className="flex items-center gap-2 mb-4">
-                        {product.featured && (
-                          <Badge className="bg-primary text-white">
-                            <Star className="w-3 h-3 mr-1" />
-                            Featured
-                          </Badge>
-                        )}
-                        {product.customizable && (
-                          <Badge variant="outline" className="border-primary text-primary">
-                            Customizable
-                          </Badge>
-                        )}
-                        {product.main_category_data?.type && (
-                          <Badge variant="outline" className={product.main_category_data.type === 'edible' ? 'border-green-500 text-green-500' : 'border-blue-500 text-blue-500'}>
-                            {product.main_category_data.type === 'edible' ? 'Edible Gift' : 'Non-Edible Gift'}
-                          </Badge>
-                        )}
-                      </div>
+                      <Label htmlFor="featured" className="font-normal text-sm">Featured product</Label>
+                      <p className="text-xs text-muted-foreground">Show this product in featured sections</p>
                     </div>
-                  </div>
-                  <div className="text-3xl font-bold text-primary">
-                    {product.has_price_range 
-                      ? `₹${formatPrice(Number(product.price_min))} - ₹${formatPrice(Number(product.price_max))}` 
-                      : `₹${formatPrice(Number(product.price))}`}
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="flex items-center gap-2">
-                      <Tag className="w-4 h-4 text-slate-500" />
-                      <div>
-                        <p className="text-sm text-slate-500">Category</p>
-                        <p className="font-medium text-slate-800">
-                          {product.main_category_data?.name || 'Uncategorized'}
-                          {product.primary_category_data?.name && (
-                            <>
-                              <span className="mx-2">→</span>
-                              {product.primary_category_data.name}
-                            </>
-                          )}
-                          {product.secondary_category_data?.name && (
-                            <>
-                              <span className="mx-2">→</span>
-                              {product.secondary_category_data.name}
-                            </>
-                          )}
-                        </p>
-                        {product.secondary_category_data?.description && (
-                          <p className="text-sm text-slate-500 mt-1">{product.secondary_category_data.description}</p>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {product.moq && (
-                      <div className="flex items-center gap-2">
-                        <Package className="w-4 h-4 text-slate-500" />
-                        <div>
-                          <p className="text-sm text-slate-500">MOQ</p>
-                          <p className="font-medium text-slate-800">{product.moq} units</p>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {product.delivery && (
-                      <div className="flex items-center gap-2">
-                        <Truck className="w-4 h-4 text-slate-500" />
-                        <div>
-                          <p className="text-sm text-slate-500">Delivery</p>
-                          <p className="font-medium text-slate-800">{product.delivery}</p>
-                        </div>
-                      </div>
-                    )}
                   </div>
                   
-                  {product.description && (
-                    <>
-                      <Separator />
-                      <div>
-                        <h3 className="font-semibold text-slate-800 mb-2">Description</h3>
-                        <p className="text-slate-600 leading-relaxed whitespace-pre-line">{product.description}</p>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="customizable"
+                      checked={formData.customizable || false}
+                      onCheckedChange={(checked) => handleCheckboxChange("customizable", checked === true)}
+                      disabled={!editMode}
+                    />
+                    <div>
+                      <Label htmlFor="customizable" className="font-normal text-sm">Customizable product</Label>
+                      <p className="text-xs text-muted-foreground">Allow customers to customize this product</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Display & Hover Images Card */}
+          <Card className="border-neutral-200 bg-white shadow-sm hover:shadow-md transition-shadow">
+            <CardHeader className="pb-3 border-b bg-neutral-50/50">
+              <CardTitle className="text-lg font-medium">Special Images</CardTitle>
+              <p className="text-xs text-muted-foreground">These images are shown on product listings</p>
+            </CardHeader>
+            <CardContent className="space-y-6 p-6">
+              {/* Display Image */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="display-image" className="text-sm font-medium">Display Image</Label>
+                  <Badge variant="outline" className="text-xs bg-green-50 text-green-600 hover:bg-green-50 border-green-200">Main</Badge>
+                </div>
+                <div className="border rounded-md overflow-hidden shadow-sm">
+                  <div className="h-36 bg-neutral-50 relative flex items-center justify-center">
+                    {formData.display_image ? (
+                      <>
+                        <img 
+                          src={formData.display_image} 
+                          alt="Display image preview" 
+                          className="max-h-full max-w-full object-contain" 
+                        />
+                        {editMode && (
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, display_image: null }))}
+                            className="absolute top-2 right-2 bg-white/90 text-red-500 rounded-full p-1 hover:bg-white shadow-sm"
+                            style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-center p-2">
+                        <Upload className="mx-auto h-8 w-8 text-neutral-300 mb-2" />
+                        <p className="text-sm text-neutral-400">Main product image</p>
+                        <p className="text-xs text-neutral-400 mt-1">Select from gallery below</p>
                       </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        )}
-      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Hover Image */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="hover-image" className="text-sm font-medium">Hover Image</Label>
+                  <Badge variant="outline" className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-50 border-blue-200">Hover</Badge>
+                </div>
+                <div className="border rounded-md overflow-hidden shadow-sm">
+                  <div className="h-36 bg-neutral-50 relative flex items-center justify-center">
+                    {formData.hover_image ? (
+                      <>
+                        <img 
+                          src={formData.hover_image} 
+                          alt="Hover image preview" 
+                          className="max-h-full max-w-full object-contain" 
+                        />
+                        {editMode && (
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, hover_image: null }))}
+                            className="absolute top-2 right-2 bg-white/90 text-red-500 rounded-full p-1 hover:bg-white shadow-sm"
+                            style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-center p-2">
+                        <Upload className="mx-auto h-8 w-8 text-neutral-300 mb-2" />
+                        <p className="text-sm text-neutral-400">Hover effect image</p>
+                        <p className="text-xs text-neutral-400 mt-1">Select from gallery below</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </form>
     </div>
   )
 } 

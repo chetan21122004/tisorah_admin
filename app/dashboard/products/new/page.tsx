@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Upload } from "lucide-react"
+import { ArrowLeft, Upload, ImageIcon, X } from "lucide-react"
 import { getCategories, createProduct } from "@/lib/supabase"
 import { uploadMultipleImages } from "@/lib/storage"
 import Link from "next/link"
@@ -530,8 +530,8 @@ export default function NewProductPage() {
           {/* Regular Product Images */}
           <Card className="border-neutral-200 bg-white shadow-sm hover:shadow-md transition-shadow">
             <CardHeader className="pb-3 border-b bg-neutral-50/50">
-              <CardTitle className="text-lg font-medium">Additional Product Images</CardTitle>
-              <p className="text-xs text-muted-foreground">Upload multiple product images to showcase different angles</p>
+              <CardTitle className="text-lg font-medium">Image Gallery</CardTitle>
+              <p className="text-xs text-muted-foreground">Upload images and set display/hover images for your product</p>
             </CardHeader>
             <CardContent className="p-6">
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
@@ -544,33 +544,56 @@ export default function NewProductPage() {
                         onClick={() => removeImage(index)}
                         className="w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-sm"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M18 6 6 18"></path>
-                          <path d="m6 6 12 12"></path>
-                        </svg>
+                        <X className="h-4 w-4" />
                       </button>
                     </div>
                     <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white p-1.5 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         type="button"
-                        onClick={() => setSelectedDisplayImageIndex(index === selectedDisplayImageIndex ? null : index)}
+                        onClick={() => {
+                          // If this image is currently set as hover, don't allow it to be display
+                          if (index === selectedHoverImageIndex) {
+                            toast.error("Same image cannot be used for both display and hover")
+                            return
+                          }
+                          setSelectedDisplayImageIndex(index === selectedDisplayImageIndex ? null : index)
+                        }}
                         className={`text-xs px-2 py-1 rounded-sm ${index === selectedDisplayImageIndex ? 'bg-green-600' : 'bg-gray-600 hover:bg-gray-500'} transition-colors`}
                       >
                         {index === selectedDisplayImageIndex ? 'Display ✓' : 'Display'}
                       </button>
                       <button
                         type="button"
-                        onClick={() => setSelectedHoverImageIndex(index === selectedHoverImageIndex ? null : index)}
+                        onClick={() => {
+                          // If this image is currently set as display, don't allow it to be hover
+                          if (index === selectedDisplayImageIndex) {
+                            toast.error("Same image cannot be used for both display and hover")
+                            return
+                          }
+                          setSelectedHoverImageIndex(index === selectedHoverImageIndex ? null : index)
+                        }}
                         className={`text-xs px-2 py-1 rounded-sm ${index === selectedHoverImageIndex ? 'bg-blue-600' : 'bg-gray-600 hover:bg-gray-500'} transition-colors`}
                       >
                         {index === selectedHoverImageIndex ? 'Hover ✓' : 'Hover'}
                       </button>
                     </div>
+                    <div className="absolute top-2 left-2 flex gap-1">
+                      {index === selectedDisplayImageIndex && (
+                        <Badge className="bg-green-500/90 text-white">
+                          Display
+                        </Badge>
+                      )}
+                      {index === selectedHoverImageIndex && (
+                        <Badge className="bg-blue-500/90 text-white">
+                          Hover
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 ))}
                 <label className="aspect-square bg-neutral-100 rounded-md border border-dashed border-neutral-300 flex flex-col items-center justify-center cursor-pointer hover:bg-neutral-50 transition-colors text-neutral-500 hover:border-primary/30">
                   <Upload className="w-6 h-6 mb-2 text-neutral-400" />
-                  <span className="text-xs font-medium">Add Image</span>
+                  <span className="text-xs font-medium">Add Images</span>
                   <span className="text-xs text-neutral-400 mt-1">Click to upload</span>
                   <input
                     type="file"
@@ -646,13 +669,16 @@ export default function NewProductPage() {
           <Card className="border-neutral-200 bg-white shadow-sm hover:shadow-md transition-shadow">
             <CardHeader className="pb-3 border-b bg-neutral-50/50">
               <CardTitle className="text-lg font-medium">Special Images</CardTitle>
-              <p className="text-xs text-muted-foreground">These images are shown on product listings</p>
+              <p className="text-xs text-muted-foreground">Select display and hover images from your gallery below</p>
             </CardHeader>
             <CardContent className="space-y-6 p-6">
               {/* Display Image */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="display-image" className="text-sm font-medium">Display Image</Label>
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <ImageIcon className="h-4 w-4 text-green-500" />
+                    Display Image
+                  </Label>
                   <Badge variant="outline" className="text-xs bg-green-50 text-green-600 hover:bg-green-50 border-green-200">Main</Badge>
                 </div>
                 <div className="border rounded-md overflow-hidden shadow-sm">
@@ -670,10 +696,7 @@ export default function NewProductPage() {
                           className="absolute top-2 right-2 bg-white/90 text-red-500 rounded-full p-1 hover:bg-white shadow-sm"
                           style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M18 6 6 18"></path>
-                            <path d="m6 6 12 12"></path>
-                          </svg>
+                          <X className="h-4 w-4" />
                         </button>
                       </>
                     ) : selectedDisplayImageIndex !== null ? (
@@ -689,24 +712,11 @@ export default function NewProductPage() {
                       </>
                     ) : (
                       <div className="text-center p-2">
-                        <Upload className="mx-auto h-8 w-8 text-neutral-300 mb-2" />
-                        <p className="text-sm text-neutral-400">Main product image</p>
-                        <p className="text-xs text-neutral-400 mt-1">Displayed on product listings</p>
+                        <ImageIcon className="mx-auto h-8 w-8 text-neutral-300 mb-2" />
+                        <p className="text-sm text-neutral-400">No display image selected</p>
+                        <p className="text-xs text-neutral-400 mt-1">Choose from gallery below</p>
                       </div>
                     )}
-                  </div>
-                  <div className="bg-neutral-50 p-2 border-t">
-                    <label className="w-full cursor-pointer inline-flex items-center justify-center px-3 py-1.5 text-xs bg-white hover:bg-neutral-50 border border-neutral-200 rounded text-neutral-700 transition-colors">
-                      <Upload className="mr-1.5 h-3.5 w-3.5" />
-                      {displayImagePreview ? 'Replace Image' : 'Upload Image'}
-                      <input
-                        id="display-image"
-                        type="file"
-                        accept="image/png, image/jpeg, image/webp"
-                        className="hidden"
-                        onChange={(e) => handleSpecialImageChange(e, 'display')}
-                      />
-                    </label>
                   </div>
                 </div>
               </div>
@@ -714,7 +724,10 @@ export default function NewProductPage() {
               {/* Hover Image */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="hover-image" className="text-sm font-medium">Hover Image</Label>
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <ImageIcon className="h-4 w-4 text-blue-500" />
+                    Hover Image
+                  </Label>
                   <Badge variant="outline" className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-50 border-blue-200">Hover</Badge>
                 </div>
                 <div className="border rounded-md overflow-hidden shadow-sm">
@@ -732,10 +745,7 @@ export default function NewProductPage() {
                           className="absolute top-2 right-2 bg-white/90 text-red-500 rounded-full p-1 hover:bg-white shadow-sm"
                           style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M18 6 6 18"></path>
-                            <path d="m6 6 12 12"></path>
-                          </svg>
+                          <X className="h-4 w-4" />
                         </button>
                       </>
                     ) : selectedHoverImageIndex !== null ? (
@@ -751,24 +761,11 @@ export default function NewProductPage() {
                       </>
                     ) : (
                       <div className="text-center p-2">
-                        <Upload className="mx-auto h-8 w-8 text-neutral-300 mb-2" />
-                        <p className="text-sm text-neutral-400">Hover effect image</p>
-                        <p className="text-xs text-neutral-400 mt-1">Shown when customers hover</p>
+                        <ImageIcon className="mx-auto h-8 w-8 text-neutral-300 mb-2" />
+                        <p className="text-sm text-neutral-400">No hover image selected</p>
+                        <p className="text-xs text-neutral-400 mt-1">Choose from gallery below</p>
                       </div>
                     )}
-                  </div>
-                  <div className="bg-neutral-50 p-2 border-t">
-                    <label className="w-full cursor-pointer inline-flex items-center justify-center px-3 py-1.5 text-xs bg-white hover:bg-neutral-50 border border-neutral-200 rounded text-neutral-700 transition-colors">
-                      <Upload className="mr-1.5 h-3.5 w-3.5" />
-                      {hoverImagePreview ? 'Replace Image' : 'Upload Image'}
-                      <input
-                        id="hover-image"
-                        type="file"
-                        accept="image/png, image/jpeg, image/webp"
-                        className="hidden"
-                        onChange={(e) => handleSpecialImageChange(e, 'hover')}
-                      />
-                    </label>
                   </div>
                 </div>
               </div>
