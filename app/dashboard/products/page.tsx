@@ -316,18 +316,29 @@ export default function ProductsPage() {
           {products.map((product) => (
             <Link key={product.id} href={`/dashboard/products/${product.id}`}>
               <Card className="overflow-hidden hover:shadow-lg transition-shadow bg-white/80 backdrop-blur-sm border-0">
-                <div className="aspect-square relative">
+                <div className="aspect-square relative group">
+                  {/* Display Image */}
                   {product.display_image || (product.images?.[0]) ? (
-                        <img 
+                    <img 
                       src={product.display_image || product.images?.[0]}
-                          alt={product.name}
-                      className="w-full h-full object-cover"
+                      alt={product.name}
+                      className="w-full h-full object-cover transition-opacity duration-300 group-hover:opacity-0"
                     />
                   ) : (
                     <div className="w-full h-full bg-slate-100 flex items-center justify-center">
                       <span className="text-slate-400">No image</span>
                     </div>
                   )}
+                  
+                  {/* Hover Image - Absolutely positioned on top */}
+                  {product.hover_image && (
+                    <img 
+                      src={product.hover_image}
+                      alt={`${product.name} hover`}
+                      className="absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                    />
+                  )}
+                  
                   {product.main_category_data?.type && (
                     <div className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-medium ${
                       product.main_category_data.type === 'edible' 
