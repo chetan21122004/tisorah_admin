@@ -15,8 +15,8 @@ export async function getProducts() {
     .select(`
       *,
       main_category_data:categories!main_category(id, name, slug, type, level),
-      primary_category_data:categories!primary_category(id, name, slug, description, level),
-      secondary_category_data:categories!secondary_category(id, name, slug, description, level)
+      primary_category_data:categories!primary_category(id, name, slug, type, description, level),
+      secondary_category_data:categories!secondary_category(id, name, slug, type, description, level)
     `)
     .order('created_at', { ascending: false });
 
@@ -34,8 +34,8 @@ export async function getProductById(id: string) {
     .select(`
       *,
       main_category_data:categories!main_category(id, name, slug, type, level),
-      primary_category_data:categories!primary_category(id, name, slug, description, level),
-      secondary_category_data:categories!secondary_category(id, name, slug, description, level)
+      primary_category_data:categories!primary_category(id, name, slug, type, description, level),
+      secondary_category_data:categories!secondary_category(id, name, slug, type, description, level)
     `)
     .eq('id', id)
     .single();
@@ -119,9 +119,9 @@ export async function updateProduct(id: string, product: any) {
       .eq('id', id)
       .select(`
         *,
-        main_category_data:categories!main_category(id, name, slug),
-        primary_category_data:categories!primary_category(id, name, slug),
-        secondary_category_data:categories!secondary_category(id, name, slug)
+        main_category_data:categories!main_category(id, name, slug, type),
+        primary_category_data:categories!primary_category(id, name, slug, description),
+        secondary_category_data:categories!secondary_category(id, name, slug, description)
       `)
       .single();
 
@@ -165,8 +165,8 @@ export async function getProductsPaginated(
     .select(`
       *,
       main_category_data:categories!main_category(id, name, slug, type),
-      primary_category_data:categories!primary_category(id, name, slug, description),
-      secondary_category_data:categories!secondary_category(id, name, slug, description)
+      primary_category_data:categories!primary_category(id, name, slug, type, description),
+      secondary_category_data:categories!secondary_category(id, name, slug, type, description)
     `, { count: 'exact' });
 
   // Apply search filter
@@ -269,9 +269,9 @@ export async function createCategory(category: any) {
     } else {
       const parentCategory = await getCategoryById(category.parent_id);
       if (parentCategory?.level === 'main') {
-        category.level = 'primary';
-      } else if (parentCategory?.level === 'primary') {
         category.level = 'secondary';
+      } else if (parentCategory?.level === 'secondary') {
+        category.level = 'tertiary';
       }
     }
   }
@@ -301,9 +301,9 @@ export async function updateCategory(id: string, category: any) {
   if (category.parent_id) {
     const parentCategory = await getCategoryById(category.parent_id);
     if (parentCategory?.level === 'main') {
-      category.level = 'primary';
-    } else if (parentCategory?.level === 'primary') {
       category.level = 'secondary';
+    } else if (parentCategory?.level === 'secondary') {
+      category.level = 'tertiary';
     }
   } else if (category.parent_id === null) {
     category.level = 'main';

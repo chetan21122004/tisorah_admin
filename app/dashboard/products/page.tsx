@@ -15,8 +15,8 @@ interface Category {
   name: string
   slug: string
   parent_id: string | null
-  type: 'edible' | 'non_edible'
-  level: 'main' | 'primary' | 'secondary'
+  type: 'edible' | 'non_edible' | null
+  level: 'main' | 'secondary' | 'tertiary' | 'quaternary'
   description?: string
   image_url?: string | null
   created_at?: string | null
@@ -44,23 +44,23 @@ interface Product {
     id: string
     name: string
     slug: string
-    type: 'edible' | 'non_edible'
+    type: 'edible' | 'non_edible' | null
     level: 'main'
   } | null
   primary_category_data: {
     id: string
     name: string
     slug: string
-    type: 'edible' | 'non_edible'
-    level: 'primary'
+    type: 'edible' | 'non_edible' | null
+    level: 'secondary'
     description?: string
   } | null
   secondary_category_data: {
     id: string
     name: string
     slug: string
-    type: 'edible' | 'non_edible'
-    level: 'secondary'
+    type: 'edible' | 'non_edible' | null
+    level: 'tertiary'
     description?: string
   } | null
 }
@@ -166,7 +166,7 @@ export default function ProductsPage() {
   // Get categories by level
   const mainCategories = categories.filter(cat => cat.level === 'main')
   const primaryCategories = categories.filter(cat => 
-    cat.level === 'primary' && 
+    cat.level === 'secondary' && 
     cat.parent_id === selectedCategory
   )
 
@@ -253,8 +253,19 @@ export default function ProductsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {/* Group categories by type */}
-                  <SelectItem value="edible" disabled className="font-semibold text-primary">
+                  {/* Gift Type Categories */}
+                  <SelectItem value="gift_types" disabled className="font-semibold text-primary">
+                    Gift Types
+                  </SelectItem>
+                  {mainCategories
+                    .filter(cat => cat.type === null)
+                    .map((category) => (
+                      <SelectItem key={category.id} value={category.id} className="pl-4">
+                        {category.name}
+                      </SelectItem>
+                  ))}
+                  {/* Edible Categories */}
+                  <SelectItem value="edible" disabled className="font-semibold text-primary mt-2">
                     Edible Gifts
                   </SelectItem>
                   {mainCategories
@@ -264,6 +275,7 @@ export default function ProductsPage() {
                         {category.name}
                       </SelectItem>
                   ))}
+                  {/* Non-Edible Categories */}
                   <SelectItem value="non_edible" disabled className="font-semibold text-primary mt-2">
                     Non-Edible Gifts
                   </SelectItem>

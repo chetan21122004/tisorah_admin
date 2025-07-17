@@ -109,7 +109,7 @@ export interface Database {
           image_url: string | null
           parent_id: string | null
           type: 'edible' | 'non_edible' | null
-          level: 'main' | 'primary' | 'secondary' | null
+          level: 'main' | 'secondary' | 'tertiary' | 'quaternary' | null
           created_at: string | null
           updated_at: string | null
           count: number | null
@@ -122,7 +122,7 @@ export interface Database {
           image_url?: string | null
           parent_id?: string | null
           type?: 'edible' | 'non_edible' | null
-          level?: 'main' | 'primary' | 'secondary' | null
+          level?: 'main' | 'secondary' | 'tertiary' | 'quaternary' | null
           created_at?: string | null
           updated_at?: string | null
           count?: number | null
@@ -135,7 +135,7 @@ export interface Database {
           image_url?: string | null
           parent_id?: string | null
           type?: 'edible' | 'non_edible' | null
-          level?: 'main' | 'primary' | 'secondary' | null
+          level?: 'main' | 'secondary' | 'tertiary' | 'quaternary' | null
           created_at?: string | null
           updated_at?: string | null
           count?: number | null

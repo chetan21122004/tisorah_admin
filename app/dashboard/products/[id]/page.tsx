@@ -23,7 +23,7 @@ interface Category {
   slug: string
   parent_id: string | null
   type: 'edible' | 'non_edible'
-  level: 'main' | 'primary' | 'secondary'
+  level: 'main' | 'secondary' | 'tertiary' | 'quaternary'
   description?: string
   image_url?: string | null
   created_at?: string | null
@@ -37,7 +37,7 @@ interface CategoryFromAPI {
   slug: string
   parent_id: string | null
   type: 'edible' | 'non_edible' | null
-  level: 'main' | 'primary' | 'secondary' | null
+  level: 'main' | 'secondary' | 'tertiary' | 'quaternary' | null
   description: string | null
   image_url: string | null
   created_at: string | null
@@ -50,7 +50,7 @@ interface CategoryData {
   name: string
   slug: string
   type: 'edible' | 'non_edible'
-  level: 'main' | 'primary' | 'secondary'
+  level: 'main' | 'secondary' | 'tertiary' | 'quaternary'
   description?: string
 }
 
@@ -85,7 +85,7 @@ interface ProductFormData {
     name: string
     slug: string
     type: 'edible' | 'non_edible'
-    level: 'primary'
+    level: 'secondary'
     description?: string
   } | null
   secondary_category_data?: {
@@ -93,7 +93,7 @@ interface ProductFormData {
     name: string
     slug: string
     type: 'edible' | 'non_edible'
-    level: 'secondary'
+    level: 'tertiary'
     description?: string
   } | null
 }
@@ -145,11 +145,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   // Get categories by level
   const mainCategories = categories.filter(cat => cat.level === 'main')
   const primaryCategories = categories.filter(cat => 
-    cat.level === 'primary' && 
+    cat.level === 'secondary' && 
     cat.parent_id === formData.main_category
   )
   const secondaryCategories = categories.filter(cat => 
-    cat.level === 'secondary' && 
+    cat.level === 'tertiary' && 
     cat.parent_id === formData.primary_category
   )
 
@@ -166,18 +166,18 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         
         // Filter out any categories with invalid type or level and convert to proper Category type
         const validCategories = categoriesData
-          .filter((cat: CategoryFromAPI) => 
+          .filter((cat: any) => 
             cat.type && cat.level && 
             (cat.type === 'edible' || cat.type === 'non_edible') &&
-            (cat.level === 'main' || cat.level === 'primary' || cat.level === 'secondary')
+            (cat.level === 'main' || cat.level === 'secondary' || cat.level === 'tertiary' || cat.level === 'quaternary')
           )
-          .map((cat: CategoryFromAPI): Category => ({
+          .map((cat: any): Category => ({
             id: cat.id,
             name: cat.name,
             slug: cat.slug,
             parent_id: cat.parent_id,
             type: cat.type as 'edible' | 'non_edible',
-            level: cat.level as 'main' | 'primary' | 'secondary',
+            level: cat.level as 'main' | 'secondary' | 'tertiary' | 'quaternary',
             description: cat.description || undefined,
             image_url: cat.image_url,
             created_at: cat.created_at,
@@ -215,7 +215,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             name: prod.primary_category_data.name,
             slug: prod.primary_category_data.slug,
             type: (prod.primary_category_data.type || 'non_edible') as 'edible' | 'non_edible',
-            level: 'primary' as const,
+            level: 'secondary' as const,
             description: prod.primary_category_data.description || undefined
           }
 
@@ -224,7 +224,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             name: prod.secondary_category_data.name,
             slug: prod.secondary_category_data.slug,
             type: (prod.secondary_category_data.type || 'non_edible') as 'edible' | 'non_edible',
-            level: 'secondary' as const,
+            level: 'tertiary' as const,
             description: prod.secondary_category_data.description || undefined
           }
 
@@ -362,11 +362,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       const productData: any = {
         ...formData,
         images: sanitizedImages,
-        price: parseFloat(formData.price_min) || 0, // Set price to min price as fallback
+        price: formData.price_min ? Number(formData.price_min) : 0, // Set price to min price as fallback
         has_price_range: true, // Always true
-        price_min: parseFloat(formData.price_min) || 0,
-        price_max: parseFloat(formData.price_max) || 0,
-        moq: formData.moq ? parseFloat(formData.moq) : null
+        price_min: formData.price_min ? Number(formData.price_min) : 0,
+        price_max: formData.price_max ? Number(formData.price_max) : 0,
+        moq: formData.moq ? Number(formData.moq) : null
       }
       
       // Only include display_image and hover_image if they exist

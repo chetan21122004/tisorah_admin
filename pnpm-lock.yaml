@@ -1,5 +1,2 @@
-lockfileVersion: '9.0'
-
-settings:
-  autoInstallPeers: true
-  excludeLinksFromLockfile: false
+NEXT_PUBLIC_SUPABASE_URL=https://mobgvuggkfjinwftjrzo.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vYmd2dWdna2ZqaW53ZnRqcnpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkwMjY4MTIsImV4cCI6MjA2NDYwMjgxMn0.uagST8mBkznfXwbLqhEVlsHftmImG4vFoXrflDJkoOQ

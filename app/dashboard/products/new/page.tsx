@@ -21,8 +21,8 @@ interface Category {
   name: string
   slug: string
   parent_id: string | null
-  type?: 'edible' | 'non_edible'
-  level?: 'main' | 'primary' | 'secondary'
+  type?: 'edible' | 'non_edible' | null
+  level?: 'main' | 'secondary' | 'tertiary' | 'quaternary'
   description?: string
   image_url?: string | null
   created_at?: string | null
@@ -61,11 +61,11 @@ export default function NewProductPage() {
   // Get categories by level
   const mainCategories = categories.filter(cat => cat.level === 'main')
   const primaryCategories = categories.filter(cat => 
-    cat.level === 'primary' && 
+    cat.level === 'secondary' && 
     cat.parent_id === formData.main_category
   )
   const secondaryCategories = categories.filter(cat => 
-    cat.level === 'secondary' && 
+    cat.level === 'tertiary' && 
     cat.parent_id === formData.primary_category
   )
 
@@ -450,16 +450,46 @@ export default function NewProductPage() {
                       <SelectValue placeholder="Select main category" />
                     </SelectTrigger>
                     <SelectContent>
-                      {mainCategories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name} ({category.type === 'edible' ? 'Edible' : 'Non-Edible'})
-                        </SelectItem>
+                      {/* Gift Type Categories */}
+                      <SelectItem value="gift_types" disabled className="font-semibold text-primary">
+                        Gift Types
+                      </SelectItem>
+                      {mainCategories
+                        .filter(cat => cat.type === null)
+                        .map((category) => (
+                          <SelectItem key={category.id} value={category.id} className="pl-4">
+                            {category.name}
+                          </SelectItem>
+                      ))}
+                      
+                      {/* Edible Categories */}
+                      <SelectItem value="edible_header" disabled className="font-semibold text-primary mt-2">
+                        Edible Gifts
+                      </SelectItem>
+                      {mainCategories
+                        .filter(cat => cat.type === 'edible')
+                        .map((category) => (
+                          <SelectItem key={category.id} value={category.id} className="pl-4">
+                            {category.name}
+                          </SelectItem>
+                      ))}
+                      
+                      {/* Non-Edible Categories */}
+                      <SelectItem value="non_edible_header" disabled className="font-semibold text-primary mt-2">
+                        Non-Edible Gifts
+                      </SelectItem>
+                      {mainCategories
+                        .filter(cat => cat.type === 'non_edible')
+                        .map((category) => (
+                          <SelectItem key={category.id} value={category.id} className="pl-4">
+                            {category.name}
+                          </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   {categoryType && (
                     <p className="text-sm text-slate-500 mt-1">
-                      Selected category type: {categoryType === 'edible' ? 'Edible Gifts' : 'Non-Edible Gifts'}
+                      Selected category type: {categoryType === 'edible' ? 'Edible Gifts' : categoryType === 'non_edible' ? 'Non-Edible Gifts' : 'Gift Type'}
                     </p>
                   )}
                 </div>
